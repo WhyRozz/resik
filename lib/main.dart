@@ -7,7 +7,8 @@ import 'features/auth/register/register_step2.dart';
 import 'features/auth/forgot_password/forgot_password_screen.dart';
 import 'features/auth/forgot_password/verify_otp_screen.dart';
 import 'features/auth/forgot_password/reset_password_screen.dart';
-
+import 'features/home/home_user_screen.dart';
+import 'features/admin/home_admin_screen.dart';
 void main() {
   runApp(const MyApp());
 }
@@ -54,6 +55,10 @@ class MyApp extends StatelessWidget {
             token: args['token'],
           );
         },
+        '/home-user': (context) => const HomeUserScreen(),
+        '/home-admin': (context) => const HomeAdminScreen(),
+        //'/scan': (context) => const ScanPage(),
+        //'/penjemputan': (context) => const PenjemputanPage(),
       },
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../../config/api_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ✅ UBAH: StatelessWidget → StatefulWidget
 class LoginScreen extends StatefulWidget {
@@ -51,16 +52,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (result['status'] == 'success') {
         final tipe = result['data']['tipe'];
-        final user = result['data']['user'];
+        // Cast ke Map agar bisa ditambah field baru
+        final Map<String, dynamic> user = Map<String, dynamic>.from(
+          result['data']['user'],
+        );
 
+        // ✅ PENTING: Masukkan 'tipe' ke dalam object user sebelum disimpan
+        user['tipe'] = tipe;
+
+        // ✅ SIMPAN KE SHARED PREFERENCES
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_logged_in', true);
+        await prefs.setString('user_type', tipe);
+        await prefs.setString('user_data', jsonEncode(user));
+
+        // ✅ Navigasi sesuai role
         if (tipe == 'masyarakat' || tipe == 'pns') {
-          Navigator.pushReplacementNamed(context, '/home-user', arguments: user);
+          Navigator.pushReplacementNamed(context, '/home-user');
         } else if (tipe == 'petugas') {
-          Navigator.pushReplacementNamed(context, '/admin-dashboard', arguments: user);
+          Navigator.pushReplacementNamed(context, '/home-admin');
         }
+
         _showSnackBar('Login berhasil!');
-      } else {
-        _showSnackBar(result['message'] ?? 'Login gagal');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -130,7 +143,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.all(24),
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(30),
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -238,7 +253,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: Divider(color: Colors.grey[300], thickness: 1),
+                            child: Divider(
+                              color: Colors.grey[300],
+                              thickness: 1,
+                            ),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -252,7 +270,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           Expanded(
-                            child: Divider(color: Colors.grey[300], thickness: 1),
+                            child: Divider(
+                              color: Colors.grey[300],
+                              thickness: 1,
+                            ),
                           ),
                         ],
                       ),
@@ -333,16 +354,25 @@ class _LoginScreenState extends State<LoginScreen> {
         controller: controller, // ← ✅ Pakai controller dari parameter
         obscureText: obscureText,
         keyboardType: keyboardType,
-        style: const TextStyle(color: Color(0xFF1B5E20), fontFamily: 'Montserrat'),
+        style: const TextStyle(
+          color: Color(0xFF1B5E20),
+          fontFamily: 'Montserrat',
+        ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Montserrat'),
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontFamily: 'Montserrat',
+          ),
           prefixIcon: Icon(prefixIcon, color: const Color(0xFF2E7D32)),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
       ),
     );

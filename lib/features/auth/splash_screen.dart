@@ -49,7 +49,7 @@ class SplashScreen extends StatefulWidget {
     if (!mounted) return;
 
     if (isLoggedIn) {
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(context, '/login');
     } else {
       Navigator.pushReplacement(
         context,
