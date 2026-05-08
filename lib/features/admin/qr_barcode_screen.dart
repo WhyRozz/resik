@@ -3,7 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
-import 'form_transaksi_setor_screen.dart'; // Form untuk input setoran
+import 'form_transaksi_setor_screen_v2.dart'; // Form untuk input setoran
 
 class QrBarcodeScreen extends StatefulWidget {
   const QrBarcodeScreen({super.key});
@@ -121,7 +121,7 @@ class _QrBarcodeScreenState extends State<QrBarcodeScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => FormTransaksiSetorScreen(
+              builder: (_) => FormTransaksiSetorScreenV2(
                 userData: result['data'],
                 kodeQr: scannedCode,
               ),

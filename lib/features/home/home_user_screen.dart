@@ -126,12 +126,12 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
 
       // ✅ LOG INI WAJIB ADA - biar kita tahu isi response-nya
       debugPrint("📥 Status Code: ${response.statusCode}");
-      debugPrint("📄 RAW Response Body: ${response.body}"); // ← INI PENTING!
+      debugPrint("📄 RAW Response Body: ${response.body}");
 
       if (response.statusCode == 200) {
         try {
           final result = jsonDecode(response.body);
-          debugPrint("🔍 Parsed Result: $result"); // ← Lihat struktur JSON-nya
+          debugPrint("🔍 Parsed Result: $result");
 
           if (mounted) {
             if (result['status'] == 'success') {
@@ -140,14 +140,26 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
               // ✅ Cek apakah kunci 'saldo' dan 'total_setoran' ada
               if (data.containsKey('saldo') &&
                   data.containsKey('total_setoran')) {
-                final saldo = data['saldo'];
-                final totalSetoran = data['total_setoran'] ?? 0;
+                // ✅ FIX 1: Parse saldo ke double (bisa String atau num dari JSON)
+                final saldoRaw = data['saldo'];
+                final saldo = saldoRaw is num
+                    ? saldoRaw
+                    : double.tryParse(saldoRaw.toString()) ?? 0;
+
+                // ✅ FIX 2: Parse total_setoran ke double (INI YANG ERROR SEBELUMNYA)
+                final totalSetoranRaw = data['total_setoran'];
+                final totalSetoran = totalSetoranRaw is num
+                    ? totalSetoranRaw
+                    : double.tryParse(totalSetoranRaw.toString()) ?? 0;
 
                 debugPrint("✅ Saldo: $saldo, Total Setoran: $totalSetoran");
 
                 setState(() {
+                  // ✅ Format saldo: hapus .00 jika bilangan bulat
                   saldoText =
-                      "Rp ${saldo.toString().replaceAll(RegExp(r'\.00'), '')}";
+                      "Rp ${saldo.toStringAsFixed(0).replaceAll(RegExp(r'(?<=\.\d*?)0+$'), '')}";
+
+                  // ✅ Format total_setoran: 1 desimal + "Kg" (sekarang aman karena sudah double)
                   totalSetoranText = "${totalSetoran.toStringAsFixed(1)} Kg";
                 });
               } else {
