@@ -1,11 +1,11 @@
 class ApiConfig {
-  static const String baseUrl = 'http://192.168.18.2:8000/api';
-  static const String storageUrl = 'http://192.168.18.2:8000/storage';
+  static const String baseUrl = 'http://172.16.106.144:8000/api';
+  static const String storageUrl = 'http://172.16.106.144:8000/storage';
 
   static Map<String, String> get headers => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
 
   // ==================== 🔐 AUTH ENDPOINTS ====================
   static String get register => '$baseUrl/register';
@@ -24,7 +24,7 @@ class ApiConfig {
   // ==================== 📊 DATA PUBLIK ====================
   static String get dinas => '$baseUrl/dinas';
   static String get artikel => '$baseUrl/artikel';
-  static String get jenisSampah => '$baseUrl/jenis-sampah';  // ✅ TAMBAH INI
+  static String get jenisSampah => '$baseUrl/jenis-sampah'; // ✅ TAMBAH INI
 
   // ==================== 📝 LAPORAN (SAMPAH ILEGAL) ====================
   static String get laporanStore => '$baseUrl/laporan';
@@ -35,12 +35,16 @@ class ApiConfig {
   static String get penarikanIndex => '$baseUrl/penarikan';
 
   // ==================== 🔄 TRANSAKSI SETOR (PETUGAS) ====================
-  static String get cariPengguna => '$baseUrl/cari-pengguna';        // ✅ TAMBAH INI
-  static String get transaksiSetorStore => '$baseUrl/transaksi-setor'; // ✅ TAMBAH INI
+  static String get cariPengguna => '$baseUrl/cari-pengguna'; // ✅ TAMBAH INI
+  static String get transaksiSetorStore =>
+      '$baseUrl/transaksi-setor'; // ✅ TAMBAH INI
 
   // ==================== 📋 RIWAYAT ====================
-  static const String riwayatSetorIndex = '$baseUrl/riwayat-setor';
+  static String get riwayatSetorIndex => '$baseUrl/riwayat-setor';
+  static String get penjemputanStore => '$baseUrl/penjemputan';
+  static String get riwayatPenjemputan => '$baseUrl/riwayat-penjemputan';
+  static String get riwayatSetorPetugas => '$baseUrl/riwayat-setor-petugas';
 
   // ==================== 📍 INFO TPS ====================
-  static const String infoTps = '$baseUrl/tps';
+  static String get infoTps => '$baseUrl/tps';
 }
