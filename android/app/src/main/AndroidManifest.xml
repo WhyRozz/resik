@@ -1,9 +1,29 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ✅ IZIN LOKASI -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    
+    <!-- IZIN KAMERA & STORAGE -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <!-- IZIN BACA MEDIA -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+
+
     <application
         android:label="RESIK"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyCD3LHUuyXeLh4kxFF3lkIql8OGOkoY2YM" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

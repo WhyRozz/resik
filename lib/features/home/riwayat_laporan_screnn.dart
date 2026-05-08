@@ -1,47 +1,104 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../../../config/api_config.dart';
 import 'home_user_screen.dart';
 import 'laporan_screen.dart';
 import 'detail_laporan_screen.dart';
 import 'riwayat_setor_screen.dart';
 import 'info_tps_screen.dart';
 
-class RiwayatLaporanScreen extends StatelessWidget {
+class RiwayatLaporanScreen extends StatefulWidget {
   const RiwayatLaporanScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Data dummy (nanti diganti dengan API)
-    final List<Map<String, dynamic>> laporanData = [
-      {
-        'judul': 'Sampah Menumpuk di Jalan Raya',
-        'alamat': 'Jl. Melangun Kulon',
-        'tanggal': '24 April 2026',
-        'status': 'Proses',
-        'foto': 'https://via.placeholder.com/100', // Nanti dari API
-      },
-      {
-        'judul': 'Sampah Menumpuk',
-        'alamat': 'Jl. Melangun Kulon',
-        'tanggal': '24 April 2026',
-        'status': 'Proses',
-        'foto': null, // Tidak ada foto
-      },
-      {
-        'judul': 'Sampah Menumpuk...',
-        'alamat': 'Jl. Melangun Kulon',
-        'tanggal': '24 April 2026',
-        'status': 'Proses',
-        'foto': null,
-      },
-      {
-        'judul': 'Sampah Menumpuk...',
-        'alamat': 'Jl. Melangun Kulon',
-        'tanggal': '24 April 2026',
-        'status': 'Proses',
-        'foto': null,
-      },
-    ];
+  State<RiwayatLaporanScreen> createState() => _RiwayatLaporanScreenState();
+}
 
+class _RiwayatLaporanScreenState extends State<RiwayatLaporanScreen> {
+  List<dynamic> _laporanData = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchRiwayatLaporan();
+  }
+
+  Future<void> _fetchRiwayatLaporan() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userDataStr = prefs.getString('user_data');
+      final userType = prefs.getString('user_type');
+
+      if (userDataStr == null || userType == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Silakan login ulang';
+        });
+        return;
+      }
+
+      final userData = jsonDecode(userDataStr);
+      final userId = userData['id_masyarakat'] ?? userData['id_pns'];
+
+      final response = await http.get(
+        Uri.parse(ApiConfig.laporanIndex).replace(
+          queryParameters: {'user_id': userId.toString(), 'tipe': userType},
+        ),
+        headers: {'Accept': 'application/json'},
+      );
+
+      debugPrint("📄 RAW Response: ${response.body}");
+
+      final result = jsonDecode(response.body);
+
+      // ✅ BAGIAN YANG DIPERBAIKI:
+      if (response.statusCode == 200 && result['status'] == 'success') {
+        final data = result['data'] ?? [];
+
+        // ✅ DEBUG: Print URL foto
+        for (var item in data) {
+          debugPrint("📸 Foto URL: ${item['foto']}");
+        }
+
+        // ✅ PENTING: Update state dengan data DAN set loading false
+        setState(() {
+          _laporanData = data;
+          _isLoading = false; // ← ✅ INI YANG TADI HILANG!
+        });
+      } else {
+        // ✅ Handle jika API return error
+        setState(() {
+          _errorMessage = result['message'] ?? 'Gagal memuat data';
+          _isLoading = false; // ← ✅ Jangan lupa ini juga!
+        });
+      }
+    } catch (e) {
+      debugPrint("🚨 Exception: $e");
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Koneksi error: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // ✅ Refresh pull-to-refresh
+  Future<void> _onRefresh() async {
+    await _fetchRiwayatLaporan();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -60,15 +117,73 @@ class RiwayatLaporanScreen extends StatelessWidget {
         children: [
           // ✅ LIST RIWAYAT LAPORAN
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: laporanData.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final data = laporanData[index];
-                return _buildLaporanCard(context, data); // ✅ Pass context
-              },
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Colors.grey[600]),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _fetchRiwayatLaporan,
+                          child: const Text('Coba Lagi'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _laporanData.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.report_outlined,
+                          size: 80,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Belum ada riwayat laporan',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LaporanScreen(),
+                            ),
+                          ),
+                          child: const Text('Buat Laporan Sekarang'),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _onRefresh,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _laporanData.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final data = _laporanData[index];
+                        return _buildLaporanCard(context, data);
+                      },
+                    ),
+                  ),
           ),
 
           // ✅ BUBBLE TABS
@@ -90,12 +205,7 @@ class RiwayatLaporanScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _buildBubble(
-                    'Riwayat',
-                    Icons.history,
-                    true, // Active
-                    () {},
-                  ),
+                  child: _buildBubble('Riwayat', Icons.history, true, () {}),
                 ),
               ],
             ),
@@ -108,88 +218,109 @@ class RiwayatLaporanScreen extends StatelessWidget {
     );
   }
 
-  // ✅ CARD RIWAYAT LAPORAN (SESUAI GAMBAR)
+  // ✅ CARD RIWAYAT LAPORAN
   Widget _buildLaporanCard(BuildContext context, Map<String, dynamic> data) {
     return GestureDetector(
       onTap: () {
+        // ✅ NAVIGASI KE DETAIL SCREEN DENGAN DATA
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => DetailLaporanScreen(
-              laporan: <String, dynamic>{
-                'nama': 'Farida',
-                'lokasi': data['alamat'],
-                'keterangan': data['judul'],
-                'tanggal': data['tanggal'],
-                'status': data['status'],
-                'foto': data['foto'],
-              },
-            ),
+            builder: (context) => DetailLaporanScreen(laporan: data),
           ),
         );
       },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Thumbnail Foto
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: data['foto'] != null && data['foto'].toString().isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        data['foto'].toString(),
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          debugPrint("❌ Error load gambar: $error");
+                          debugPrint("🔗 URL: ${data['foto']}");
+                          return const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                            size: 32,
+                          );
+                        },
+                      ),
+                    )
+                  : const Icon(Icons.image, color: Colors.grey, size: 32),
+            ),
+            const SizedBox(width: 12),
+            // Info Laporan
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data['judul'] ?? data['keterangan'] ?? 'Tanpa Judul',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1B5E20),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  _buildInfoRow('📍', data['alamat'] ?? data['lokasi'] ?? '-'),
+                  _buildInfoRow('📅', data['tanggal'] ?? '-'),
+                  const SizedBox(height: 8),
+                  _buildStatusBadge(data['status'] ?? 'Unknown'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String icon, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
       child: Row(
         children: [
-          // Thumbnail Foto
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: data['foto'] != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      data['foto'],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          Icon(Icons.image_not_supported, color: Colors.grey),
-                    ),
-                  )
-                : const Icon(Icons.image, color: Colors.grey, size: 32),
-          ),
-          const SizedBox(width: 12),
-          // Info Laporan
+          Text(icon, style: const TextStyle(fontSize: 11)),
+          const SizedBox(width: 4),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  data['judul'],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1B5E20),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                _buildInfoRow('Alamat', data['alamat']),
-                _buildInfoRow('Tanggal', data['tanggal']),
-                const SizedBox(height: 8),
-                // Status Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFC107), // Kuning untuk "Proses"
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    data['status'],
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -197,35 +328,40 @@ class RiwayatLaporanScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 60,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: Colors.grey,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const Text(': ', style: TextStyle(fontSize: 11, color: Colors.grey)),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF1B5E20),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
+  Widget _buildStatusBadge(String status) {
+    Color badgeColor;
+    switch (status.toLowerCase()) {
+      case 'diproses':
+      case 'proses':
+        badgeColor = const Color(0xFFFFC107); // Kuning
+        break;
+      case 'diterima':
+      case 'berhasil':
+        badgeColor = const Color(0xFF4CAF50); // Hijau
+        break;
+      case 'ditolak':
+        badgeColor = const Color(0xFFF44336); // Merah
+        break;
+      case 'ditarik':
+        badgeColor = Colors.grey;
+        break;
+      default:
+        badgeColor = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: badgeColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
       ),
     );
   }
@@ -268,7 +404,6 @@ class RiwayatLaporanScreen extends StatelessWidget {
     );
   }
 
-  // ✅ BOTTOM NAVIGATION STYLE KONSISTEN
   Widget _buildConsistentBottomNav(BuildContext context) {
     final items = [
       {'icon': Icons.home_outlined, 'active': Icons.home, 'label': 'Home'},
@@ -304,7 +439,7 @@ class RiwayatLaporanScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: List.generate(items.length, (index) {
-          final isActive = index == 1; // Tab Laporan aktif
+          final isActive = index == 1;
           final item = items[index];
 
           return GestureDetector(
