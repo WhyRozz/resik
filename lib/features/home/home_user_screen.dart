@@ -16,7 +16,14 @@ import 'riwayat_penarikan_screen.dart';
 import 'info_tps_screen.dart';
 
 class HomeUserScreen extends StatefulWidget {
-  const HomeUserScreen({super.key});
+  final double? initialSaldo;
+  final double? initialTotalSetoran;
+
+  const HomeUserScreen({
+    super.key,
+    this.initialSaldo,
+    this.initialTotalSetoran,
+  });
 
   @override
   State<HomeUserScreen> createState() => _HomeUserScreenState();
@@ -51,6 +58,18 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
     _loadUserData();
     _fetchSaldo();
     _fetchArtikel();
+    // ✅ Jika ada data awal dari login, langsung set
+    if (widget.initialSaldo != null) {
+      setState(() {
+        saldoText = "Rp ${widget.initialSaldo!.toInt()}";
+        totalSetoranText =
+            "${widget.initialTotalSetoran!.toStringAsFixed(1)} Kg";
+      });
+    } else {
+      // Jika tidak, fetch seperti biasa
+      _fetchSaldo();
+    }
+    _fetchArtikel();
   }
 
   @override
@@ -80,41 +99,86 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
     final userData = prefs.getString('user_data');
     if (userData != null && mounted) {
       setState(() => _userData = jsonDecode(userData));
+
+      _fetchSaldo();
+      _fetchArtikel();
     }
   }
 
   Future<void> _fetchSaldo() async {
-    if (_userData == null) return;
+    if (_userData == null) {
+      debugPrint("⚠️ _fetchSaldo: _userData masih null!");
+      return;
+    }
+
+    debugPrint("🔄 Fetching saldo untuk user: ${_userData!['nama']}");
+
     try {
-      final uri = Uri.parse(ApiConfig.getSaldo).replace(
-        queryParameters: {
-          'user_id': (_userData!['id_masyarakat'] ?? _userData!['id_pns'])
-              .toString(),
-          'tipe': _userData!['tipe'],
-        },
-      );
-      final response = await http.get(uri).timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200 && mounted) {
-        final result = jsonDecode(response.body);
-        if (result['status'] == 'success') {
-          setState(() {
-            final saldo = result['data']['saldo'];
-            saldoText =
-                "Rp ${saldo.toString().replaceAll(RegExp(r'\.00'), '')}";
-            final totalSetoran = result['data']['total_setoran'] ?? 0;
-            totalSetoranText = "${totalSetoran.toStringAsFixed(1)} Kg";
-          });
+      final userId = (_userData!['id_masyarakat'] ?? _userData!['id_pns'])
+          .toString();
+      final userType = _userData!['tipe'];
+
+      final uri = Uri.parse(
+        ApiConfig.getSaldo,
+      ).replace(queryParameters: {'user_id': userId, 'tipe': userType});
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      // ✅ LOG INI WAJIB ADA - biar kita tahu isi response-nya
+      debugPrint("📥 Status Code: ${response.statusCode}");
+      debugPrint("📄 RAW Response Body: ${response.body}"); // ← INI PENTING!
+
+      if (response.statusCode == 200) {
+        try {
+          final result = jsonDecode(response.body);
+          debugPrint("🔍 Parsed Result: $result"); // ← Lihat struktur JSON-nya
+
+          if (mounted) {
+            if (result['status'] == 'success') {
+              final data = result['data'];
+
+              // ✅ Cek apakah kunci 'saldo' dan 'total_setoran' ada
+              if (data.containsKey('saldo') &&
+                  data.containsKey('total_setoran')) {
+                final saldo = data['saldo'];
+                final totalSetoran = data['total_setoran'] ?? 0;
+
+                debugPrint("✅ Saldo: $saldo, Total Setoran: $totalSetoran");
+
+                setState(() {
+                  saldoText =
+                      "Rp ${saldo.toString().replaceAll(RegExp(r'\.00'), '')}";
+                  totalSetoranText = "${totalSetoran.toStringAsFixed(1)} Kg";
+                });
+              } else {
+                debugPrint(
+                  "❌ Kunci 'saldo' atau 'total_setoran' tidak ada di response!",
+                );
+                debugPrint("🔑 Keys yang ada: ${data.keys.toList()}");
+              }
+            } else {
+              debugPrint(
+                "❌ API Error: ${result['message'] ?? 'Unknown error'}",
+              );
+            }
+          } else {
+            debugPrint("⚠️ Widget tidak mounted, setState() dilewati");
+          }
+        } catch (jsonError) {
+          debugPrint("🚨 JSON Decode Error: $jsonError");
+          debugPrint("📄 Response yang gagal di-parse: ${response.body}");
         }
       }
     } catch (e) {
-      debugPrint("Gagal refresh saldo: $e");
-      if (mounted)
+      debugPrint("🚨 Exception: $e");
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal memuat  $e'),
+            content: Text('Gagal refresh saldo: $e'),
             backgroundColor: Colors.red,
           ),
         );
+      }
     }
   }
 
@@ -444,10 +508,19 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
 
   Widget _buildHeader() {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ProfileScreen()),
-      ),
+      onTap: () async {
+        // ✅ TUNGGU result dari ProfileScreen
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ProfileScreen()),
+        );
+
+        // ✅ Jika result true (profil diupdate), reload data
+        if (result == true && mounted) {
+          debugPrint("🔄 Profile updated, reloading home data...");
+          _loadUserData(); // ← Reload data dari SharedPreferences
+        }
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -699,7 +772,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                       top: Radius.circular(12),
                     ),
                     child: Image.network(
-                      '${ApiConfig.baseUrl}/storage/${artikel['foto']}',
+                      '${ApiConfig.storageUrl}/${artikel['foto']}',
                       height: 120,
                       width: double.infinity,
                       fit: BoxFit.cover,

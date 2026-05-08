@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:resik/features/home/home_user_screen.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import '../../config/api_config.dart';
+import 'home_user_screen.dart';
 import 'laporan_screen.dart';
-import 'info_tps_screen.dart';
 import 'riwayat_penarikan_screen.dart';
+import 'info_tps_screen.dart';
 
 class RiwayatSetorScreen extends StatefulWidget {
   const RiwayatSetorScreen({super.key});
@@ -12,38 +16,86 @@ class RiwayatSetorScreen extends StatefulWidget {
 }
 
 class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
-  int _filterIndex = 0; // 0: Semua Riwayat, 1: 7 Hari Terakhir
+  List<dynamic> _setorData = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  String _filterStatus = 'all'; // 'all' atau '7days'
 
-  // Data dummy (nanti diganti API dengan filter tanggal)
-  final List<Map<String, dynamic>> _allData = [
-    {
-      'tanggal': 'Senin, 27 April 2026',
-      'bank': 'Bank Sampah Kecamatan',
-      'jenis': '',
-      'berat': '',
-      'harga': '',
-    },
-    {
-      'tanggal': 'Senin, 25 Februari 2026',
-      'bank': 'Bank Sampah Kecamatan',
-      'jenis': '',
-      'berat': '',
-      'harga': '',
-    },
-    {
-      'tanggal': 'Senin, 25 Februari 2026',
-      'bank': 'Bank Sampah Kecamatan',
-      'jenis': '',
-      'berat': '',
-      'harga': '',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchRiwayatSetor();
+  }
+
+  Future<void> _fetchRiwayatSetor() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userDataStr = prefs.getString('user_data');
+      final userType = prefs.getString('user_type');
+
+      if (userDataStr == null || userType == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Silakan login ulang';
+        });
+        return;
+      }
+
+      final userData = jsonDecode(userDataStr);
+      final userId = userData['id_masyarakat'] ?? userData['id_pns'];
+
+      // ✅ Fetch dari API
+      final response = await http
+          .get(
+            Uri.parse(ApiConfig.riwayatSetorIndex).replace(
+              queryParameters: {
+                'id_masyarakat': userType == 'masyarakat'
+                    ? userId.toString()
+                    : null,
+                'id_pns': userType == 'pns' ? userId.toString() : null,
+                'tipe_user': userType,
+              },
+            ),
+            headers: {'Accept': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      debugPrint("📥 Status: ${response.statusCode}");
+      debugPrint("📄 Response: ${response.body}");
+
+      final result = jsonDecode(response.body);
+
+      if (mounted) {
+        if (response.statusCode == 200 && result['status'] == 'success') {
+          setState(() {
+            _setorData = result['data'] ?? [];
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _errorMessage = result['message'] ?? 'Gagal memuat data';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("❌ HTTP Error: $e");
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Koneksi error: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Filter data berdasarkan pilihan
-    final displayData = _filterIndex == 0 ? _allData : _getlast7DaysData();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -67,38 +119,105 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: _buildFilterBubble(
-                    'Semua Riwayat',
-                    _filterIndex == 0,
-                    () => setState(() => _filterIndex = 0),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _filterStatus = 'all'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _filterStatus == 'all'
+                            ? const Color(0xFF4CAF50)
+                            : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Semua Riwayat',
+                          style: TextStyle(
+                            color: _filterStatus == 'all'
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _buildFilterBubble(
-                    '7 Hari Terakhir',
-                    _filterIndex == 1,
-                    () => setState(() => _filterIndex = 1),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _filterStatus = '7days'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _filterStatus == '7days'
+                            ? const Color(0xFF4CAF50)
+                            : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '7 Hari Terakhir',
+                          style: TextStyle(
+                            color: _filterStatus == '7days'
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          // ✅ LIST RIWAYAT
+          // ✅ LIST DATA
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: displayData.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final data = displayData[index];
-                return _buildSetorCard(data);
-              },
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _fetchRiwayatSetor,
+                          child: const Text('Coba Lagi'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _setorData.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history, size: 80, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Belum ada riwayat setor',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  )
+                : _buildFilteredList(),
           ),
 
-          // ✅ BUBBLE TABS (BANK SAMPAH)
+          // ✅ BUBBLE TABS
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -107,8 +226,8 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
                 Expanded(
                   child: _buildBubble(
                     'Riwayat Setor',
-                    Icons.upload_rounded,
-                    true, // Active
+                    Icons.upload,
+                    true,
                     () {},
                   ),
                 ),
@@ -116,7 +235,7 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
                 Expanded(
                   child: _buildBubble(
                     'Riwayat Penarikan',
-                    Icons.download_rounded,
+                    Icons.download,
                     false,
                     () => Navigator.push(
                       context,
@@ -130,106 +249,14 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
             ),
           ),
 
-          // ✅ BOTTOM NAVIGATION (KONSISTEN)
+          // ✅ BOTTOM NAVIGATION
           _buildConsistentBottomNav(context),
         ],
       ),
     );
   }
 
-  // ✅ FILTER BUBBLE
-  Widget _buildFilterBubble(String label, bool isActive, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF4CAF50) : const Color(0xFFE8F5E9),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: isActive ? Colors.white : const Color(0xFF4CAF50),
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ✅ CARD RIWAYAT SETOR (SESUAI GAMBAR)
-  Widget _buildSetorCard(Map<String, dynamic> data) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Card
-          Text(
-            data['bank'],
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1B5E20),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Info Rows
-          _buildInfoRow('Jenis Sampah', data['jenis'] ?? '-'),
-          const SizedBox(height: 6),
-          _buildInfoRow('Berat', data['berat'] ?? '-'),
-          const SizedBox(height: 6),
-          _buildInfoRow('Total Harga', data['harga'] ?? '-'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        const Text(': ', style: TextStyle(fontSize: 12, color: Colors.grey)),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF1B5E20),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
+  // ✅ HELPER: BUBBLE TABS
   Widget _buildBubble(
     String label,
     IconData icon,
@@ -268,7 +295,7 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
     );
   }
 
-  // ✅ BOTTOM NAVIGATION STYLE KONSISTEN
+  // ✅ HELPER: BOTTOM NAVIGATION
   Widget _buildConsistentBottomNav(BuildContext context) {
     final items = [
       {'icon': Icons.home_outlined, 'active': Icons.home, 'label': 'Home'},
@@ -304,8 +331,7 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: List.generate(items.length, (index) {
-          // Index 2 (Bank Sampah) aktif di halaman ini
-          final isActive = index == 2;
+          final isActive = index == 2; // Bank Sampah aktif
           final item = items[index];
 
           return GestureDetector(
@@ -365,29 +391,206 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
     );
   }
 
-  // // ✅ FILTER DATA 7 HARI TERAKHIR
-  // List<Map<String, dynamic>> _getlast7DaysData() {
-  //   final now = DateTime.now();
-  //   final sevenDaysAgo = now.subtract(const Duration(days: 7));
+  // ✅ FILTER LIST
+  Widget _buildFilteredList() {
+    final filteredData = _filterStatus == '7days'
+        ? _setorData.where((item) {
+            final tanggal = DateTime.tryParse(item['tanggal_transaksi'] ?? '');
+            if (tanggal == null) return false;
+            final now = DateTime.now();
+            final difference = now.difference(tanggal).inDays;
+            return difference <= 7;
+          }).toList()
+        : _setorData;
 
-  //   return _allData.where((item) {
-  //     // Parse tanggal dari string (nanti disesuaikan dengan format dari API)
-  //     // Contoh: "Senin, 27 April 2026"
-  //     final tanggalStr = item['tanggal'] as String;
-  //     // Simple check - nanti pakai proper date parsing
-  //     return true; // Placeholder - implementasi sesuai kebutuhan
-  //   }).toList();
-  // }
+    if (filteredData.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.filter_list, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              _filterStatus == '7days'
+                  ? 'Tidak ada transaksi 7 hari terakhir'
+                  : 'Belum ada riwayat setor',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      );
+    }
 
-  List<Map<String, dynamic>> _getlast7DaysData() {
-    final now = DateTime.now();
-    final sevenDaysAgo = now.subtract(const Duration(days: 7));
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: filteredData.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final data = filteredData[index];
+        return _buildSetorCard(data);
+      },
+    );
+  }
 
-    return _allData.where((item) {
-      final tanggal = DateTime.parse(
-        item['tanggal_iso'],
-      ); // Format ISO dari API
-      return tanggal.isAfter(sevenDaysAgo);
-    }).toList();
+  // ✅ CARD RIWAYAT SETOR
+  Widget _buildSetorCard(Map<String, dynamic> data) {
+    final String tanggal = (data['tanggal_transaksi'] ?? '-').toString();
+    final String jenisSampah = (data['jenis_sampah'] ?? 'Umum').toString();
+    final double berat = (data['berat'] ?? 0).toDouble();
+    final double hargaPerKg = (data['harga_per_kg'] ?? 0).toDouble();
+    final double totalRupiah = (data['total_rupiah'] ?? 0).toDouble();
+    final String petugas = (data['nama_petugas'] ?? '-').toString();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Tanggal & Icon
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.recycling,
+                  color: Color(0xFF4CAF50),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bank Sampah Kecamatan',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1B5E20),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      tanggal,
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Detail: Jenis Sampah, Berat, Harga
+          _buildInfoRow('Jenis Sampah', jenisSampah),
+          _buildInfoRow('Berat', '${berat.toStringAsFixed(1)} kg'),
+          _buildInfoRow(
+            'Harga per Kg',
+            'Rp ${hargaPerKg.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+          ),
+
+          const Divider(height: 24),
+
+          // Total & Petugas
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Total Harga',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Rp ${totalRupiah.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1B5E20),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.person,
+                      size: 14,
+                      color: Color(0xFF2196F3),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      petugas,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2196F3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ),
+          const Text(': ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF1B5E20),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

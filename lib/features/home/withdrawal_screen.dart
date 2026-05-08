@@ -64,11 +64,16 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Siapkan parameter
-      final tipeUser = _userData!['tipe']; // 'masyarakat' atau 'pns'
+      final tipeUser = _userData!['tipe'];
       final userId = _userData!['id_masyarakat'] ?? _userData!['id_pns'];
       final nominalRaw = _nominalCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
       final jumlahUang = double.tryParse(nominalRaw) ?? 0;
+
+      // ✅ DEBUG: Print request yang dikirim
+      debugPrint("📤 Request URL: ${ApiConfig.penarikanStore}");
+      debugPrint(
+        "📤 Request Body: ${jsonEncode({'id_masyarakat': tipeUser == 'masyarakat' ? userId : null, 'id_pns': tipeUser == 'pns' ? userId : null, 'tipe_user': tipeUser, 'nama': _namaCtrl.text, 'jenis_ewallet': _selectedEWallet, 'nomor_ewallet': _nomorEWalletCtrl.text, 'jumlah_uang': jumlahUang})}",
+      );
 
       final response = await http
           .post(
@@ -86,56 +91,97 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
           )
           .timeout(const Duration(seconds: 30));
 
-      final result = jsonDecode(response.body);
+      // ✅ DEBUG: Print response mentah
+      debugPrint("📥 Status Code: ${response.statusCode}");
+      debugPrint("📥 RAW Response: ${response.body}");
 
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (response.statusCode == 200) {
+        try {
+          final result = jsonDecode(response.body);
 
-        if (response.statusCode == 200 && result['status'] == 'success') {
-          // Success dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 32),
-                  SizedBox(width: 8),
-                  Text('Berhasil!', style: TextStyle(color: Color(0xFF1B5E20))),
-                ],
-              ),
-              content: const Text(
-                'Pengajuan penarikan berhasil diajukan. Dana akan ditransfer dalam 1-3 hari kerja.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(
-                      color: Color(0xFF4CAF50),
-                      fontWeight: FontWeight.bold,
-                    ),
+          if (mounted) {
+            setState(() => _isLoading = false);
+
+            if (result['status'] == 'success') {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
+                  title: const Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: Color(0xFF2E7D32),
+                        size: 32,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Berhasil!',
+                        style: TextStyle(color: Color(0xFF1B5E20)),
+                      ),
+                    ],
+                  ),
+                  content: const Text(
+                    'Pengajuan penarikan berhasil diajukan.\n\n'
+                    '💰 Saldo Anda telah dikurangi\n'
+                    '⏰ Dana akan ditransfer dalam 1-3 hari kerja\n'
+                    '📱 Cek status di Riwayat Penarikan',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context); // Close dialog
+                        Navigator.pop(context); // Back to previous screen
+                      },
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(
+                          color: Color(0xFF4CAF50),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          );
-        } else {
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(result['message'] ?? 'Terjadi kesalahan'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint("🚨 JSON Parse Error: $e");
+          if (mounted) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Response bukan JSON valid: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message'] ?? 'Terjadi kesalahan'),
+              content: Text(
+                'Server error: ${response.statusCode}\n${response.body.substring(0, 200)}',
+              ),
               backgroundColor: Colors.red,
             ),
           );
         }
       }
     } catch (e) {
+      debugPrint("🚨 Exception: $e");
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

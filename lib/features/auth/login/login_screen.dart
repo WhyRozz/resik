@@ -31,7 +31,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
 
-    // Validasi sederhana
     if (email.isEmpty || password.isEmpty) {
       _showSnackBar('Email dan password wajib diisi');
       return;
@@ -47,36 +46,102 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       setState(() => _isLoading = false);
-
       final result = jsonDecode(response.body);
 
       if (result['status'] == 'success') {
-        final tipe = result['data']['tipe'];
-        // Cast ke Map agar bisa ditambah field baru
-        final Map<String, dynamic> user = Map<String, dynamic>.from(
-          result['data']['user'],
+        // ✅ 1. AMBIL DATA USER (tanpa token)
+        final String tipe = result['data']['tipe'] ?? '';
+
+        if (tipe.isEmpty) {
+          _showSnackBar('Tipe user tidak ditemukan');
+          return;
+        }
+
+        // ✅ 2. Proses User Data
+        final Map<String, dynamic> userData = Map<String, dynamic>.from(
+          result['data']['user'] ?? {},
         );
 
-        // ✅ PENTING: Masukkan 'tipe' ke dalam object user sebelum disimpan
-        user['tipe'] = tipe;
+        userData['tipe'] = tipe;
 
-        // ✅ SIMPAN KE SHARED PREFERENCES
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('is_logged_in', true);
-        await prefs.setString('user_type', tipe);
-        await prefs.setString('user_data', jsonEncode(user));
-
-        // ✅ Navigasi sesuai role
-        if (tipe == 'masyarakat' || tipe == 'pns') {
-          Navigator.pushReplacementNamed(context, '/home-user');
+        // ✅ AMBIL ID SESUAI ROLE (PENTING!)
+        String? userId;
+        if (tipe == 'masyarakat') {
+          userId = userData['id_masyarakat']?.toString();
+        } else if (tipe == 'pns') {
+          userId = userData['id_pns']?.toString();
         } else if (tipe == 'petugas') {
-          Navigator.pushReplacementNamed(context, '/home-admin');
+          userId = userData['id_petugas']?.toString(); // ✅ Tambah ini!
+        }
+
+        if (userId == null) {
+          _showSnackBar('ID user tidak valid');
+          return;
+        }
+
+        // ✅ 3. Simpan ke SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_type', tipe);
+        await prefs.setString('user_data', jsonEncode(userData));
+        await prefs.setBool('is_logged_in', true);
+
+        debugPrint("✅ Login sukses! Tipe: $tipe, User ID: $userId");
+
+        // ✅ 4. Fetch Saldo Awal (HANYA untuk masyarakat/pns)
+        double initialSaldo = 0;
+        double initialSetoran = 0;
+
+        if (tipe == 'masyarakat' || tipe == 'pns') {
+          // ✅ Jangan fetch untuk petugas!
+          try {
+            final saldoResponse = await http
+                .get(
+                  Uri.parse(
+                    '${ApiConfig.baseUrl}/api/get-saldo?user_id=$userId&tipe=$tipe',
+                  ),
+                  headers: {'Accept': 'application/json'},
+                )
+                .timeout(const Duration(seconds: 5));
+
+            if (saldoResponse.statusCode == 200) {
+              final saldoResult = jsonDecode(saldoResponse.body);
+              if (saldoResult['status'] == 'success') {
+                initialSaldo = (saldoResult['data']['saldo'] ?? 0).toDouble();
+                initialSetoran = (saldoResult['data']['total_setoran'] ?? 0)
+                    .toDouble();
+              }
+            }
+          } catch (e) {
+            debugPrint("⚠️ Gagal fetch saldo awal: $e");
+          }
+        }
+
+        // ✅ 5. NAVIGASI
+        if (tipe == 'masyarakat' || tipe == 'pns') {
+          Navigator.pushReplacementNamed(
+            context,
+            '/home-user',
+            arguments: {
+              'initialSaldo': initialSaldo,
+              'initialTotalSetoran': initialSetoran,
+            },
+          );
+        } else if (tipe == 'petugas') {
+          Navigator.pushReplacementNamed(
+            context,
+            '/home-admin',
+          ); // ✅ Admin langsung ke home-admin
+        } else {
+          _showSnackBar('Tipe user tidak dikenali');
         }
 
         _showSnackBar('Login berhasil!');
+      } else {
+        _showSnackBar(result['message'] ?? 'Login gagal');
       }
     } catch (e) {
       setState(() => _isLoading = false);
+      debugPrint("Login Error: $e");
       _showSnackBar('Terjadi kesalahan: $e');
     }
   }

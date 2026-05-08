@@ -169,7 +169,7 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.network(
-                '${ApiConfig.baseUrl}/storage/${artikel['foto']}',
+                '${ApiConfig.storageUrl}/${artikel['foto']}',
                 width: 100,
                 height: 100,
                 fit: BoxFit.cover,
