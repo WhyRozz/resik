@@ -15,6 +15,9 @@ import 'riwayat_setor_screen.dart';
 import 'riwayat_penarikan_screen.dart';
 import 'info_tps_screen.dart';
 
+// ✅ TAMBAHKAN IMPORT INI:
+import '../shared/jenis_sampah_list_screen.dart';
+
 class HomeUserScreen extends StatefulWidget {
   final double? initialSaldo;
   final double? initialTotalSetoran;
@@ -652,13 +655,38 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildSectionTitle('Artikel Edukasi'),
+
+              // ✅ ARTIKEL EDUKASI - dengan callback onViewAll
+              _buildSectionTitle(
+                'Artikel Edukasi',
+                onViewAll: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ArtikelListScreen(),
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 12),
               _isLoadingArtikel
                   ? const Center(child: CircularProgressIndicator())
                   : _buildArtikelList(),
+
               const SizedBox(height: 24),
-              _buildSectionTitle('Jenis Sampah'),
+
+              // ✅ JENIS SAMPAH - dengan callback onViewAll
+              _buildSectionTitle(
+                'Jenis Sampah',
+                onViewAll: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const JenisSampahListScreen(),
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 12),
               _buildJenisSampahGrid(),
               const SizedBox(height: 20),
@@ -717,7 +745,8 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) => Row(
+  // ✅ FIX: Method ini sekarang menerima callback onViewAll
+  Widget _buildSectionTitle(String title, {VoidCallback? onViewAll}) => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
       Text(
@@ -729,12 +758,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
         ),
       ),
       TextButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ArtikelListScreen()),
-          );
-        },
+        onPressed: onViewAll, // ✅ Gunakan callback dari parameter
         child: const Text(
           'Lihat Semua',
           style: TextStyle(color: Color(0xFF4CAF50)),

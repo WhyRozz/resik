@@ -46,6 +46,7 @@ dependencies:
   map_launcher: ^4.5.0
   mobile_scanner: ^7.2.0
   dio: ^5.4.0
+  provider: ^6.0.0
 
 dev_dependencies:
   flutter_test:

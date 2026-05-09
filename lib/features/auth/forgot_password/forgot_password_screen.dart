@@ -119,11 +119,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                         // Ilustrasi
                         Image.asset(
-                          'assets/images/forgot-password-illustration.png',
+                          'assets/images/forgot-pict.png',
                           height: 180,
                           errorBuilder: (context, error, stackTrace) {
                             return Container(
-                              height: 180,
+                              height: 240,
                               width: double.infinity,
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF1F8E9),

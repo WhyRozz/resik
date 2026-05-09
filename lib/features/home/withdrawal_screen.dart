@@ -229,7 +229,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
               Container(
                 margin: const EdgeInsets.only(top: 20),
                 child: Image.asset(
-                  'assets/images/withdrawal.png',
+                  'assets/images/penarikan-pict.png',
                   height: 150,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(

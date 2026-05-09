@@ -9,8 +9,16 @@ import 'features/auth/forgot_password/verify_otp_screen.dart';
 import 'features/auth/forgot_password/reset_password_screen.dart';
 import 'features/home/home_user_screen.dart';
 import 'features/admin/home_admin_screen.dart';
+import 'package:provider/provider.dart';
+import 'providers/statistik_provider.dart';
+
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => StatistikProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

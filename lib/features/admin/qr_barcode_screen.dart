@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import 'form_transaksi_setor_screen_v2.dart'; // Form untuk input setoran
+import 'home_admin_screen.dart';
 
 class QrBarcodeScreen extends StatefulWidget {
   const QrBarcodeScreen({super.key});
@@ -27,7 +28,12 @@ class _QrBarcodeScreenState extends State<QrBarcodeScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const HomeAdminScreen(),
+                  ),
+                ),
         ),
       ),
       body: Column(

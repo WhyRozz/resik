@@ -1,6 +1,6 @@
 class ApiConfig {
-  static const String baseUrl = 'http://172.16.106.144:8000/api';
-  static const String storageUrl = 'http://172.16.106.144:8000/storage';
+  static const String baseUrl = 'http://192.168.18.2:8000/api';
+  static const String storageUrl = 'http://192.168.18.2:8000/storage';
 
   static Map<String, String> get headers => {
     'Content-Type': 'application/json',
@@ -38,6 +38,9 @@ class ApiConfig {
   static String get cariPengguna => '$baseUrl/cari-pengguna'; // ✅ TAMBAH INI
   static String get transaksiSetorStore =>
       '$baseUrl/transaksi-setor'; // ✅ TAMBAH INI
+
+  // ==================== 🗂️ JENIS SAMPAH ====================
+  static String get jenisSampahList => '$baseUrl/jenis-sampah';
 
   // ==================== 📋 RIWAYAT ====================
   static String get riwayatSetorIndex => '$baseUrl/riwayat-setor';
