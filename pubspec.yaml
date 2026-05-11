@@ -66,10 +66,10 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo-resik.png"
+  image_path: "assets/images/logo-apk.png"
   # Untuk Android dengan adaptive icon (Android 8+)
-  adaptive_icon_background: "#4CAF50"  # Warna background
-  adaptive_icon_foreground: "assets/images/logo-resik.png"
+  adaptive_icon_background: "#000000"  # Warna background
+  adaptive_icon_foreground: "assets/images/logo-apk.png"
 # The following section is specific to Flutter packages.
 flutter:
 
