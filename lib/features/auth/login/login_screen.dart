@@ -4,7 +4,6 @@ import 'dart:convert';
 import '../../../config/api_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// ✅ UBAH: StatelessWidget → StatefulWidget
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -13,20 +12,18 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // ✅ Tambah controller sebagai instance variable
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true; // ✅ State untuk show/hide password
 
   @override
   void dispose() {
-    // ✅ Bersihkan controller saat widget dihapus
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
 
-  // ✅ Fungsi Login yang sudah benar
   Future<void> _handleLogin() async {
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
@@ -49,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final result = jsonDecode(response.body);
 
       if (result['status'] == 'success') {
-        // ✅ 1. AMBIL DATA USER (tanpa token)
         final String tipe = result['data']['tipe'] ?? '';
 
         if (tipe.isEmpty) {
@@ -57,21 +53,19 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
-        // ✅ 2. Proses User Data
         final Map<String, dynamic> userData = Map<String, dynamic>.from(
           result['data']['user'] ?? {},
         );
 
         userData['tipe'] = tipe;
 
-        // ✅ AMBIL ID SESUAI ROLE (PENTING!)
         String? userId;
         if (tipe == 'masyarakat') {
           userId = userData['id_masyarakat']?.toString();
         } else if (tipe == 'pns') {
           userId = userData['id_pns']?.toString();
         } else if (tipe == 'petugas') {
-          userId = userData['id_petugas']?.toString(); // ✅ Tambah ini!
+          userId = userData['id_petugas']?.toString();
         }
 
         if (userId == null) {
@@ -79,7 +73,6 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
-        // ✅ 3. Simpan ke SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_type', tipe);
         await prefs.setString('user_data', jsonEncode(userData));
@@ -87,12 +80,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
         debugPrint("✅ Login sukses! Tipe: $tipe, User ID: $userId");
 
-        // ✅ 4. Fetch Saldo Awal (HANYA untuk masyarakat/pns)
         double initialSaldo = 0;
         double initialSetoran = 0;
 
         if (tipe == 'masyarakat' || tipe == 'pns') {
-          // ✅ Jangan fetch untuk petugas!
           try {
             final saldoResponse = await http
                 .get(
@@ -116,7 +107,6 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
 
-        // ✅ 5. NAVIGASI
         if (tipe == 'masyarakat' || tipe == 'pns') {
           Navigator.pushReplacementNamed(
             context,
@@ -127,10 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
             },
           );
         } else if (tipe == 'petugas') {
-          Navigator.pushReplacementNamed(
-            context,
-            '/home-admin',
-          ); // ✅ Admin langsung ke home-admin
+          Navigator.pushReplacementNamed(context, '/home-admin');
         } else {
           _showSnackBar('Tipe user tidak dikenali');
         }
@@ -173,8 +160,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               children: [
                 const SizedBox(height: 20),
-
-                // Ilustrasi
                 Image.asset(
                   'assets/images/login-pict.png',
                   height: 180,
@@ -201,8 +186,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                   },
                 ),
-
-                // Area Form Putih
                 Container(
                   margin: const EdgeInsets.only(top: 0),
                   padding: const EdgeInsets.all(24),
@@ -224,28 +207,22 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-
-                      // Input Email ✅ Pakai controller yang benar
                       _buildLabel('Email'),
                       _buildTextField(
                         hint: 'Masukkan Emailmu',
                         prefixIcon: Icons.email_outlined,
-                        controller: _emailCtrl, // ← ✅ Instance variable
+                        controller: _emailCtrl,
                         keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 16),
-
-                      // Input Kata Sandi ✅ Pakai controller yang benar
                       _buildLabel('Kata Sandi'),
                       _buildTextField(
                         hint: 'Masukkan Kata Sandi',
                         prefixIcon: Icons.lock_outline,
                         obscureText: true,
-                        controller: _passwordCtrl, // ← ✅ Instance variable
+                        controller: _passwordCtrl,
                       ),
                       const SizedBox(height: 8),
-
-                      // Lupa kata sandi?
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
@@ -268,8 +245,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Tombol Masuk ✅ Panggil _handleLogin()
                       Container(
                         width: double.infinity,
                         height: 52,
@@ -313,8 +288,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-
-                      // Divider "atau"
                       Row(
                         children: [
                           Expanded(
@@ -343,8 +316,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                       const SizedBox(height: 24),
-
-                      // Belum punya akun? Daftar Disini
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -384,7 +355,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Helper Widgets
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -407,17 +377,19 @@ class _LoginScreenState extends State<LoginScreen> {
     required String hint,
     required IconData prefixIcon,
     bool obscureText = false,
-    required TextEditingController controller, // ← ✅ Wajib dikasih controller
+    required TextEditingController controller,
     TextInputType? keyboardType,
   }) {
+    final isPasswordField = obscureText;
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF1F8E9),
         borderRadius: BorderRadius.circular(12),
       ),
       child: TextField(
-        controller: controller, // ← ✅ Pakai controller dari parameter
-        obscureText: obscureText,
+        controller: controller,
+        obscureText: isPasswordField ? _obscurePassword : false,
         keyboardType: keyboardType,
         style: const TextStyle(
           color: Color(0xFF1B5E20),
@@ -430,6 +402,20 @@ class _LoginScreenState extends State<LoginScreen> {
             fontFamily: 'Montserrat',
           ),
           prefixIcon: Icon(prefixIcon, color: const Color(0xFF2E7D32)),
+          // ✅ ICON MATA untuk show/hide password
+          suffixIcon: isPasswordField
+              ? IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    color: const Color(0xFF2E7D32),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                )
+              : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
