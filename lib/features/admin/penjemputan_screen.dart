@@ -84,7 +84,7 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
 
   void _onBubbleTap(String bubble) {
     setState(() => _activeBubble = bubble);
-    
+
     if (bubble == 'form') {
       Navigator.push(
         context,
@@ -132,25 +132,37 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
             color: Colors.white,
             child: Row(
               children: [
-                Expanded(child: _buildFilterTab('Semua', _filterStatus == 'all', () {
-                  setState(() => _filterStatus = 'all');
-                })),
+                Expanded(
+                  child: _buildFilterTab('Semua', _filterStatus == 'all', () {
+                    setState(() => _filterStatus = 'all');
+                  }),
+                ),
                 const SizedBox(width: 8),
-                Expanded(child: _buildFilterTab('Menunggu', _filterStatus == 'pending', () {
-                  setState(() => _filterStatus = 'pending');
-                })),
+                Expanded(
+                  child: _buildFilterTab(
+                    'Menunggu',
+                    _filterStatus == 'pending',
+                    () {
+                      setState(() => _filterStatus = 'pending');
+                    },
+                  ),
+                ),
                 const SizedBox(width: 8),
-                Expanded(child: _buildFilterTab('Disetujui', _filterStatus == 'approved', () {
-                  setState(() => _filterStatus = 'approved');
-                })),
+                Expanded(
+                  child: _buildFilterTab(
+                    'Disetujui',
+                    _filterStatus == 'approved',
+                    () {
+                      setState(() => _filterStatus = 'approved');
+                    },
+                  ),
+                ),
               ],
             ),
           ),
 
           // ✅ LIST DATA
-          Expanded(
-            child: _buildContent(),
-          ),
+          Expanded(child: _buildContent()),
 
           // ✅ BUBBLE TABS (Form & Riwayat)
           Container(
@@ -221,7 +233,12 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
   }
 
   // ✅ HELPER: Bubble
-  Widget _buildBubble(String label, IconData icon, bool isActive, VoidCallback onTap) {
+  Widget _buildBubble(
+    String label,
+    IconData icon,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -229,7 +246,9 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
         decoration: BoxDecoration(
           gradient: isActive
-              ? const LinearGradient(colors: [Color(0xFF4CAF50), Color(0xFF81C784)])
+              ? const LinearGradient(
+                  colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+                )
               : null,
           color: isActive ? null : const Color(0xFFE8F5E9),
           borderRadius: BorderRadius.circular(20),
@@ -237,7 +256,11 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: isActive ? Colors.white : const Color(0xFF4CAF50)),
+            Icon(
+              icon,
+              size: 18,
+              color: isActive ? Colors.white : const Color(0xFF4CAF50),
+            ),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -261,15 +284,29 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
     final items = [
       {'icon': Icons.home_outlined, 'active': Icons.home, 'label': 'Beranda'},
       {'icon': Icons.qr_code_scanner, 'active': Icons.qr_code, 'label': 'Scan'},
-      {'icon': Icons.delivery_dining_outlined, 'active': Icons.delivery_dining, 'label': 'Penjemputan'},
-      {'icon': Icons.history_outlined, 'active': Icons.history, 'label': 'Riwayat'},
+      {
+        'icon': Icons.local_shipping,
+        'active': Icons.local_shipping,
+        'label': 'Penjemputan',
+      },
+      {
+        'icon': Icons.history_outlined,
+        'active': Icons.history,
+        'label': 'Riwayat',
+      },
     ];
 
     return Container(
       height: 65,
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -295,17 +332,31 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: isActive
-                  ? BoxDecoration(color: const Color(0xFF4CAF50), borderRadius: BorderRadius.circular(20))
+                  ? BoxDecoration(
+                      color: const Color(0xFF4CAF50),
+                      borderRadius: BorderRadius.circular(20),
+                    )
                   : null,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(isActive ? item['active'] as IconData : item['icon'] as IconData,
-                      color: isActive ? Colors.white : Colors.grey, size: 22),
+                  Icon(
+                    isActive
+                        ? item['active'] as IconData
+                        : item['icon'] as IconData,
+                    color: isActive ? Colors.white : Colors.grey,
+                    size: 22,
+                  ),
                   if (isActive) const SizedBox(width: 6),
                   if (isActive)
-                    Text(item['label'] as String,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    Text(
+                      item['label'] as String,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -318,7 +369,9 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
   // ✅ HELPER: Build Content
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF4CAF50)));
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF4CAF50)),
+      );
     }
 
     if (_errorMessage != null) {
@@ -330,12 +383,19 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600])),
+              child: Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _fetchPenjemputanList,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4CAF50), foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4CAF50),
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Coba Lagi'),
             ),
           ],
@@ -348,7 +408,8 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
         ? _penjemputanList
         : _penjemputanList.where((item) {
             final status = (item['status'] ?? '').toString().toLowerCase();
-            if (_filterStatus == 'pending') return status == 'diproses' || status == 'pending';
+            if (_filterStatus == 'pending')
+              return status == 'diproses' || status == 'pending';
             if (_filterStatus == 'approved') return status == 'disetujui';
             if (_filterStatus == 'rejected') return status == 'ditolak';
             return true;
@@ -362,7 +423,9 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
             Icon(Icons.local_shipping, size: 80, color: Colors.grey[300]),
             const SizedBox(height: 16),
             Text(
-              _filterStatus == 'all' ? 'Belum ada penjemputan' : 'Tidak ada penjemputan ${_filterStatus.toLowerCase()}',
+              _filterStatus == 'all'
+                  ? 'Belum ada penjemputan'
+                  : 'Tidak ada penjemputan ${_filterStatus.toLowerCase()}',
               style: TextStyle(color: Colors.grey[600]),
             ),
           ],
@@ -374,7 +437,8 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
       padding: const EdgeInsets.all(16),
       itemCount: filteredList.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) => _buildPenjemputanCard(filteredList[index]),
+      itemBuilder: (context, index) =>
+          _buildPenjemputanCard(filteredList[index]),
     );
   }
 
@@ -413,7 +477,13 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -423,29 +493,58 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.location_on, color: Color(0xFF2196F3), size: 24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.location_on,
+                  color: Color(0xFF2196F3),
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Lokasi Penjemputan', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                    Text(
+                      'Lokasi Penjemputan',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1B5E20),
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(lokasi, style: const TextStyle(fontSize: 11, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      lokasi,
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(statusIcon, size: 14, color: statusColor),
                     const SizedBox(width: 4),
-                    Text(statusText.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor)),
+                    Text(
+                      statusText.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -461,12 +560,20 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Row(
                 children: [
                   const Icon(Icons.note, size: 14, color: Colors.grey),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(keterangan, style: const TextStyle(fontSize: 12, color: Colors.grey))),
+                  Expanded(
+                    child: Text(
+                      keterangan,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -485,7 +592,9 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
                 errorBuilder: (_, __, ___) => Container(
                   height: 120,
                   color: Colors.grey[200],
-                  child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey),
+                  ),
                 ),
               ),
             ),
@@ -501,9 +610,24 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 120, child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey))),
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ),
           const Text(': ', style: TextStyle(fontSize: 12, color: Colors.grey)),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 12, color: Color(0xFF1B5E20), fontWeight: FontWeight.w500))),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF1B5E20),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     );

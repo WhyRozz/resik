@@ -922,8 +922,8 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
       {'icon': Icons.home_outlined, 'active': Icons.home, 'label': 'Beranda'},
       {'icon': Icons.qr_code_scanner, 'active': Icons.qr_code, 'label': 'Scan'},
       {
-        'icon': Icons.delivery_dining_outlined,
-        'active': Icons.delivery_dining,
+        'icon': Icons.local_shipping,
+        'active': Icons.local_shipping,
         'label': 'Penjemputan',
       },
       {

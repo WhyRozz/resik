@@ -678,6 +678,7 @@ class _FormPenjemputanScreenState extends State<FormPenjemputanScreen> {
                   onPressed: _isLoading ? null : _submitPenjemputan,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2E7D32),
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -692,7 +693,7 @@ class _FormPenjemputanScreenState extends State<FormPenjemputanScreen> {
                           ),
                         )
                       : const Text(
-                          'AJUKAN PENJEMPUTAN',
+                          'KIRIM',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
