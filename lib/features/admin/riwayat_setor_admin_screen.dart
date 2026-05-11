@@ -155,8 +155,12 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
       if (_selectedFilter == 'all') {
         _filteredTransactions = _allTransactions;
       } else if (_selectedFilter == 'pending') {
+        // ✅ FIX: Exclude yang sudah dibatalkan
         _filteredTransactions = _allTransactions
-            .where((t) => !t['is_confirmed'])
+            .where(
+              (t) =>
+                  !t['is_confirmed'] && t['status_transaksi'] != 'dibatalkan',
+            )
             .toList();
       } else if (_selectedFilter == 'selesai') {
         _filteredTransactions = _allTransactions
@@ -677,7 +681,8 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
   }
 
   Widget _buildTransactionCard(Map<String, dynamic> item) {
-    final bool isPending = !item['is_confirmed'];
+    final bool isPending =
+        !item['is_confirmed'] && item['status_transaksi'] != 'dibatalkan';
     final bool isSelesai =
         item['is_confirmed'] && item['status_transaksi'] != 'dibatalkan';
     final bool isDibatalkan = item['status_transaksi'] == 'dibatalkan';
@@ -809,14 +814,19 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
               ],
             )
           else
+            // ✅ Jika sudah selesai/dibatalkan, tampilkan status saja
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    isSelesai ? '✅ Transaksi Selesai' : '❌ Transaksi Ditolak',
+                    isSelesai
+                        ? '✅ Transaksi Selesai'
+                        : (isDibatalkan ? '❌ Transaksi Ditolak' : '-'),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: isSelesai ? Colors.green : Colors.red,
+                      color: isSelesai
+                          ? Colors.green
+                          : (isDibatalkan ? Colors.red : Colors.grey),
                     ),
                   ),
                 ),
