@@ -29,11 +29,9 @@ class _QrBarcodeScreenState extends State<QrBarcodeScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const HomeAdminScreen(),
-                  ),
-                ),
+            context,
+            MaterialPageRoute(builder: (_) => const HomeAdminScreen()),
+          ),
         ),
       ),
       body: Column(
@@ -261,17 +259,6 @@ class ScannerOverlayPainter extends CustomPainter {
       ),
       Offset(size.width - cornerOffset, size.height - cornerOffset),
       paint,
-    );
-
-    // Scanning line animation
-    final linePaint = Paint()
-      ..color = const Color(0xFF2196F3)
-      ..strokeWidth = 2;
-
-    canvas.drawLine(
-      Offset(0, size.height / 2),
-      Offset(size.width, size.height / 2),
-      linePaint,
     );
   }
 
