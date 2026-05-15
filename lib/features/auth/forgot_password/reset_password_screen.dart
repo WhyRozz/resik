@@ -6,47 +6,139 @@ import '../../../config/api_config.dart';
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
   final String token;
-  
+
   const ResetPasswordScreen({
-    super.key, 
-    required this.email, 
-    required this.token
+    super.key,
+    required this.email,
+    required this.token,
   });
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+class _ResetPasswordScreenState extends State<ResetPasswordScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _passwordCtrl = TextEditingController();
   final TextEditingController _confirmPasswordCtrl = TextEditingController();
+  final GlobalKey _passwordFieldKey = GlobalKey();
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+
+  // ✅ Animation controller untuk shake
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Setup shake animation
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _shakeAnimation = Tween<double>(
+      begin: -10,
+      end: 10,
+    ).chain(CurveTween(curve: Curves.easeInOut)).animate(_shakeController);
+
+    // ✅ LISTENER untuk update real-time saat user mengetik
+    _passwordCtrl.addListener(() {
+      setState(() {
+        // Rebuild UI setiap kali ada perubahan di password field
+      });
+    });
+
+    _confirmPasswordCtrl.addListener(() {
+      setState(() {
+        // Rebuild UI setiap kali ada perubahan di confirm password field
+      });
+    });
+  }
 
   @override
   void dispose() {
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
+    _shakeController.dispose();
     super.dispose();
+  }
+
+  // ✅ VALIDASI PASSWORD KUAT
+  Map<String, bool> _validatePassword(String password) {
+    return {
+      'minLength': password.length >= 8,
+      'hasUppercase': password.contains(RegExp(r'[A-Z]')),
+      'hasLowercase': password.contains(RegExp(r'[a-z]')),
+      'hasNumber': password.contains(RegExp(r'[0-9]')),
+      'hasSymbol': password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]')),
+    };
+  }
+
+  // ✅ CEK APAKAH PASSWORD SUDAH KUAT
+  bool _isPasswordStrong(String password) {
+    final validation = _validatePassword(password);
+    return validation['minLength']! &&
+        validation['hasUppercase']! &&
+        validation['hasLowercase']! &&
+        validation['hasNumber']! &&
+        validation['hasSymbol']!;
+  }
+
+  // ✅ SHAKE ANIMATION
+  void _shakeField() {
+    _shakeController.forward(from: 0).then((_) {
+      _showSnackBar('Password tidak memenuhi persyaratan!');
+    });
   }
 
   Future<void> _resetPassword() async {
     final password = _passwordCtrl.text.trim();
     final confirmPassword = _confirmPasswordCtrl.text.trim();
 
-    // Validasi
+    // Validasi password kuat
+    final validation = _validatePassword(password);
+
     if (password.isEmpty) {
+      _shakeField();
       _showSnackBar('Password baru tidak boleh kosong');
       return;
     }
 
-    if (password.length < 6) {
-      _showSnackBar('Password minimal 6 karakter');
+    if (!validation['minLength']!) {
+      _shakeField();
+      _showSnackBar('Password minimal 8 karakter');
+      return;
+    }
+
+    if (!validation['hasUppercase']!) {
+      _shakeField();
+      _showSnackBar('Password harus mengandung huruf besar');
+      return;
+    }
+
+    if (!validation['hasLowercase']!) {
+      _shakeField();
+      _showSnackBar('Password harus mengandung huruf kecil');
+      return;
+    }
+
+    if (!validation['hasNumber']!) {
+      _shakeField();
+      _showSnackBar('Password harus mengandung angka');
+      return;
+    }
+
+    if (!validation['hasSymbol']!) {
+      _shakeField();
+      _showSnackBar('Password harus mengandung Simbol (!@#\$%&*)');
       return;
     }
 
     if (password != confirmPassword) {
+      _shakeField();
       _showSnackBar('Konfirmasi password tidak cocok');
       return;
     }
@@ -71,13 +163,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
       if (result['status'] == 'success') {
         _showSnackBar('Password berhasil direset');
-        // Delay sebentar lalu kembali ke login
         await Future.delayed(const Duration(seconds: 1));
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/login',
-          (route) => false,
-        );
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       } else {
         _showSnackBar(result['message'] ?? 'Gagal reset password');
       }
@@ -100,16 +187,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final passwordValidation = _validatePassword(_passwordCtrl.text);
+    final isStrongPassword = _isPasswordStrong(_passwordCtrl.text);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF4CAF50),
-              Color(0xFF66BB6A),
-            ],
+            colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
           ),
         ),
         child: SafeArea(
@@ -155,14 +242,35 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
                         // Input Password Baru
                         _buildLabel('Masukkan Kata Sandi Baru'),
-                        _buildPasswordField(
-                          controller: _passwordCtrl,
-                          hint: '••••••••',
-                          obscureText: _obscurePassword,
-                          onToggle: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
+
+                        // ✅ SHAKE ANIMATION WRAPPER
+                        AnimatedBuilder(
+                          animation: _shakeAnimation,
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: Offset(_shakeAnimation.value, 0),
+                              child: child,
+                            );
                           },
+                          child: _buildPasswordField(
+                            key: _passwordFieldKey,
+                            controller: _passwordCtrl,
+                            hint: '••••••••',
+                            obscureText: _obscurePassword,
+                            onToggle: () {
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
+                            },
+                          ),
                         ),
+
+                        // ✅ PASSWORD REQUIREMENTS INDICATOR
+                        _buildPasswordRequirements(
+                          passwordValidation,
+                          isStrongPassword,
+                        ),
+
                         const SizedBox(height: 20),
 
                         // Input Konfirmasi Password
@@ -172,7 +280,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           hint: '••••••••',
                           obscureText: _obscureConfirmPassword,
                           onToggle: () {
-                            setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                            setState(
+                              () => _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
+                            );
                           },
                         ),
                         const SizedBox(height: 30),
@@ -199,7 +310,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           width: double.infinity,
                           height: 52,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2E7D32),
+                            color:
+                                isStrongPassword &&
+                                    _confirmPasswordCtrl.text.isNotEmpty
+                                ? const Color(0xFF2E7D32)
+                                : Colors.grey[400],
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -212,7 +327,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: _isLoading ? null : _resetPassword,
+                              onTap:
+                                  (isStrongPassword &&
+                                      _confirmPasswordCtrl.text.isNotEmpty &&
+                                      !_isLoading)
+                                  ? _resetPassword
+                                  : null,
                               borderRadius: BorderRadius.circular(12),
                               child: Center(
                                 child: _isLoading
@@ -269,13 +389,87 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     );
   }
 
+  // ✅ WIDGET PASSWORD REQUIREMENTS
+  Widget _buildPasswordRequirements(
+    Map<String, bool> validation,
+    bool isStrong,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isStrong ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isStrong ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Persyaratan Password:',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isStrong
+                  ? const Color(0xFF1B5E20)
+                  : const Color(0xFFE65100),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildRequirementItem('Minimal 8 karakter', validation['minLength']!),
+          _buildRequirementItem(
+            'Huruf besar (A-Z)',
+            validation['hasUppercase']!,
+          ),
+          _buildRequirementItem(
+            'Huruf kecil (a-z)',
+            validation['hasLowercase']!,
+          ),
+          _buildRequirementItem('Angka (0-9)', validation['hasNumber']!),
+          _buildRequirementItem(
+            'Simbol (!@#\$%&*)', // ← Escape $ dengan backslash
+            validation['hasSymbol']!,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequirementItem(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            isMet ? Icons.check_circle : Icons.circle_outlined,
+            size: 16,
+            color: isMet ? const Color(0xFF4CAF50) : Colors.grey[400],
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: isMet ? const Color(0xFF1B5E20) : Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPasswordField({
+    Key? key,
     required TextEditingController controller,
     required String hint,
     required bool obscureText,
     required VoidCallback onToggle,
   }) {
     return Container(
+      key: key,
       decoration: BoxDecoration(
         color: const Color(0xFFF1F8E9),
         borderRadius: BorderRadius.circular(12),

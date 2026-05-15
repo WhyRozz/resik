@@ -10,13 +10,49 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _emailCtrl = TextEditingController();
+  final GlobalKey _emailFieldKey = GlobalKey(); // ✅ Key untuk shake animation
+
   bool _isLoading = false;
 
+  // ✅ Animation controller untuk shake
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Setup shake animation
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _shakeAnimation = Tween<double>(
+      begin: -10,
+      end: 10,
+    ).chain(CurveTween(curve: Curves.easeInOut)).animate(_shakeController);
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  // ✅ SHAKE ANIMATION
+  void _shakeEmailField() {
+    _shakeController.forward(from: 0);
+  }
+
   Future<void> _handleResetPassword() async {
-    // Validasi email
-    if (_emailCtrl.text.isEmpty || !_emailCtrl.text.contains('@')) {
+    final email = _emailCtrl.text.trim();
+
+    // Validasi format email
+    if (email.isEmpty || !email.contains('@')) {
+      _shakeEmailField();
       _showSnackBar('Email tidak valid');
       return;
     }
@@ -27,7 +63,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       final response = await http.post(
         Uri.parse(ApiConfig.forgotPassword),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': _emailCtrl.text}),
+        body: jsonEncode({'email': email}),
       );
 
       setState(() => _isLoading = false);
@@ -35,21 +71,37 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       final result = jsonDecode(response.body);
 
       if (result['status'] == 'success') {
-        _showSnackBar('Kode verifikasi telah dikirim');
+        // ✅ Cek apakah ada pesan khusus "email tidak ditemukan"
+        final message = result['message'] ?? '';
 
-        // ✅ PENTING: Kirim email sebagai arguments!
-        Navigator.pushNamed(
-          context,
-          '/verify-otp',
-          arguments: _emailCtrl.text.trim(), // <--- KIRIM EMAIL DI SINI
-        );
+        if (message.toLowerCase().contains('tidak ditemukan') ||
+            message.toLowerCase().contains('not found') ||
+            message.toLowerCase().contains('tidak terdaftar')) {
+          // ✅ Email tidak terdaftar → Shake + error message
+          _shakeEmailField();
+          _showSnackBar('Email belum terdaftar');
+        } else {
+          // ✅ Email terdaftar → Lanjut ke OTP
+          _showSnackBar('Kode verifikasi telah dikirim');
+          Navigator.pushNamed(context, '/verify-otp', arguments: email);
+        }
       } else {
-        _showSnackBar(
-          result['message'] ?? 'Gagal mengirim link reset password',
-        );
+        final message =
+            result['message'] ?? 'Gagal mengirim link reset password';
+
+        // ✅ Cek error email tidak terdaftar
+        if (message.toLowerCase().contains('tidak ditemukan') ||
+            message.toLowerCase().contains('not found') ||
+            message.toLowerCase().contains('tidak terdaftar')) {
+          _shakeEmailField();
+          _showSnackBar('Email belum terdaftar');
+        } else {
+          _showSnackBar(message);
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
+      _shakeEmailField();
       _showSnackBar('Terjadi kesalahan: $e');
     }
   }
@@ -104,27 +156,31 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        // Judul
+                        // Judul - diperkecil dikit
                         const Text(
                           'Lupa Kata Sandi?',
                           style: TextStyle(
-                            fontSize: 28,
+                            fontSize: 24, // ← Dari 28 jadi 24
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1B5E20),
                             fontFamily: 'Montserrat',
                           ),
                         ),
 
-                        const SizedBox(height: 20),
-
-                        // Ilustrasi
+                        const SizedBox(height: 15), // ← Dari 20 jadi 15
+                        // Ilustrasi - diperkecil
                         Image.asset(
                           'assets/images/forgot-pict.png',
-                          height: 180,
+                          height: 150, // ← Dari 180 jadi 150
+                          width: double.infinity,
+                          fit: BoxFit.contain, // ← Tambah ini
                           errorBuilder: (context, error, stackTrace) {
                             return Container(
-                              height: 240,
+                              height: 150, // ← Dari 240 jadi 150
                               width: double.infinity,
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ), // ← Tambah ini
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF1F8E9),
                                 borderRadius: BorderRadius.circular(16),
@@ -134,7 +190,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 children: [
                                   Icon(
                                     Icons.lock_reset,
-                                    size: 80,
+                                    size: 60, // ← Dari 80 jadi 60
                                     color: Color(0xFF2E7D32),
                                   ),
                                   SizedBox(height: 8),
@@ -148,14 +204,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           },
                         ),
 
-                        const SizedBox(height: 30),
-
-                        // Text instruction
+                        const SizedBox(height: 25), // ← Dari 30 jadi 25
+                        // Text instruction - diperbold
                         const Text(
                           'Masukkan Alamat Email',
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.bold, // ← Tambah ini
                             color: Color(0xFF1B5E20),
                             fontFamily: 'Montserrat',
                           ),
@@ -163,43 +218,47 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                         const SizedBox(height: 16),
 
-                        // Input Email
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F8E9),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: TextField(
-                            controller: _emailCtrl,
-                            keyboardType: TextInputType.emailAddress,
-                            style: const TextStyle(
-                              color: Color(0xFF1B5E20),
-                              fontFamily: 'Montserrat',
+                        // Input Email - tambah margin horizontal
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                          ), // ← Tambah ini
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F8E9),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            decoration: InputDecoration(
-                              hintText: 'contoh@email.com',
-                              hintStyle: TextStyle(
-                                color: Colors.grey[400],
+                            child: TextField(
+                              controller: _emailCtrl,
+                              keyboardType: TextInputType.emailAddress,
+                              style: const TextStyle(
+                                color: Color(0xFF1B5E20),
                                 fontFamily: 'Montserrat',
                               ),
-                              prefixIcon: const Icon(
-                                Icons.email_outlined,
-                                color: Color(0xFF2E7D32),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
+                              decoration: InputDecoration(
+                                hintText: 'contoh@email.com',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontFamily: 'Montserrat',
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.email_outlined,
+                                  color: Color(0xFF2E7D32),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
                               ),
                             ),
                           ),
                         ),
 
-                        const SizedBox(height: 16),
-
+                        const SizedBox(height: 20), // ← Tambah spacing
                         // Kembali ke Login
                         TextButton(
                           onPressed: () {
@@ -215,53 +274,57 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           ),
                         ),
 
-                        const SizedBox(height: 16),
-
-                        // Tombol Kirim
-                        Container(
-                          width: double.infinity,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2E7D32),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: _isLoading ? null : _handleResetPassword,
+                        const SizedBox(height: 10), // ← Kurangi spacing
+                        // Tombol Kirim - tambah margin horizontal
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                          ), // ← Tambah ini
+                          child: Container(
+                            width: double.infinity,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2E7D32),
                               borderRadius: BorderRadius.circular(12),
-                              child: Center(
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        height: 24,
-                                        width: 24,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _isLoading ? null : _handleResetPassword,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Center(
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          height: 24,
+                                          width: 24,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Kirim',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'Montserrat',
+                                          ),
                                         ),
-                                      )
-                                    : const Text(
-                                        'Kirim',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Montserrat',
-                                        ),
-                                      ),
+                                ),
                               ),
                             ),
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 25), // ← Tambah spacing bawah
                       ],
                     ),
                   ),
@@ -272,11 +335,5 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _emailCtrl.dispose();
-    super.dispose();
   }
 }

@@ -25,17 +25,211 @@ class RegisterStep2 extends StatefulWidget {
   State<RegisterStep2> createState() => _RegisterStep2State();
 }
 
-class _RegisterStep2State extends State<RegisterStep2> {
+class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProviderStateMixin {
   final TextEditingController _teleponCtrl = TextEditingController();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
   final TextEditingController _confirmPasswordCtrl = TextEditingController();
+  
+  final GlobalKey _passwordFieldKey = GlobalKey(); // ✅ Key untuk shake animation
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  
+  // ✅ Animation controller untuk shake
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Setup shake animation
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _shakeAnimation = Tween<double>(begin: -10, end: 10).chain(
+      CurveTween(curve: Curves.easeInOut),
+    ).animate(_shakeController);
+    
+    // ✅ LISTENER untuk update real-time saat user mengetik password
+    _passwordCtrl.addListener(() {
+      setState(() {
+        // Rebuild UI untuk update password requirements indicator
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _teleponCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  // ✅ VALIDASI PASSWORD KUAT
+  Map<String, bool> _validatePassword(String password) {
+    return {
+      'minLength': password.length >= 8,
+      'hasUppercase': password.contains(RegExp(r'[A-Z]')),
+      'hasLowercase': password.contains(RegExp(r'[a-z]')),
+      'hasNumber': password.contains(RegExp(r'[0-9]')),
+      'hasSymbol': password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]')),
+    };
+  }
+
+  // ✅ CEK APAKAH PASSWORD SUDAH KUAT
+  bool _isPasswordStrong(String password) {
+    final validation = _validatePassword(password);
+    return validation['minLength']! &&
+           validation['hasUppercase']! &&
+           validation['hasLowercase']! &&
+           validation['hasNumber']! &&
+           validation['hasSymbol']!;
+  }
+
+  // ✅ SHAKE ANIMATION
+  void _shakePasswordField() {
+    _shakeController.forward(from: 0);
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFF2E7D32),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  void _showLoading() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+      ),
+    );
+  }
+
+  void _hideLoading() {
+    Navigator.pop(context);
+  }
+
+  void _handleRegister() async {
+    final password = _passwordCtrl.text.trim();
+    final confirmPassword = _confirmPasswordCtrl.text.trim();
+    
+    // Validasi password kuat
+    final validation = _validatePassword(password);
+    
+    if (password.isEmpty) {
+      _shakePasswordField();
+      _showSnackBar('Password tidak boleh kosong');
+      return;
+    }
+
+    if (!validation['minLength']!) {
+      _shakePasswordField();
+      _showSnackBar('Password minimal 8 karakter');
+      return;
+    }
+
+    if (!validation['hasUppercase']!) {
+      _shakePasswordField();
+      _showSnackBar('Password harus mengandung huruf besar');
+      return;
+    }
+
+    if (!validation['hasLowercase']!) {
+      _shakePasswordField();
+      _showSnackBar('Password harus mengandung huruf kecil');
+      return;
+    }
+
+    if (!validation['hasNumber']!) {
+      _shakePasswordField();
+      _showSnackBar('Password harus mengandung angka');
+      return;
+    }
+
+    if (!validation['hasSymbol']!) {
+      _shakePasswordField();
+      _showSnackBar('Password harus mengandung simbol (!@#\$%&*)');
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _shakePasswordField();
+      _showSnackBar('Konfirmasi password tidak cocok');
+      return;
+    }
+
+    // Validasi lainnya
+    if (_teleponCtrl.text.isEmpty) {
+      _showSnackBar('No telepon harus diisi');
+      return;
+    }
+    if (_emailCtrl.text.isEmpty || !_emailCtrl.text.contains('@')) {
+      _showSnackBar('Email tidak valid');
+      return;
+    }
+
+    // Show loading
+    _showLoading();
+
+    try {
+      // Prepare data
+      final requestData = {
+        'nama': widget.nama,
+        'email': _emailCtrl.text,
+        'password': password,
+        'no_telepon': _teleponCtrl.text,
+        'jenis_kelamin': widget.gender,
+        'tanggal_lahir': widget.tglLahir != null
+            ? '${widget.tglLahir!.year}-${widget.tglLahir!.month.toString().padLeft(2, '0')}-${widget.tglLahir!.day.toString().padLeft(2, '0')}'
+            : null,
+        'alamat': widget.alamat,
+        'pekerjaan': widget.job,
+        'id_dinas': widget.dinasId != null ? int.parse(widget.dinasId!) : null,
+      };
+
+      // Hit API
+      final response = await http.post(
+        Uri.parse(ApiConfig.register),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestData),
+      );
+
+      final result = jsonDecode(response.body);
+
+      if (result['status'] == 'success') {
+        final barcodeId = result['data']['barcode_id'];
+
+        _hideLoading();
+        _showSnackBar('Registrasi berhasil! Barcode: $barcodeId');
+
+        Navigator.pushReplacementNamed(context, '/login');
+      } else {
+        _hideLoading();
+        _showSnackBar(result['message'] ?? 'Registrasi gagal');
+      }
+    } catch (e) {
+      _hideLoading();
+      _showSnackBar('Terjadi kesalahan: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final passwordValidation = _validatePassword(_passwordCtrl.text);
+    final isStrongPassword = _isPasswordStrong(_passwordCtrl.text);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -111,24 +305,40 @@ class _RegisterStep2State extends State<RegisterStep2> {
 
                         // 3. Kata Sandi
                         _buildLabel('Kata Sandi'),
-                        _buildTextField(
-                          controller: _passwordCtrl,
-                          hint: 'Masukkan kata sandi',
-                          obscureText: _obscurePassword,
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              color: const Color(0xFF2E7D32),
+                        
+                        // ✅ SHAKE ANIMATION WRAPPER
+                        AnimatedBuilder(
+                          animation: _shakeAnimation,
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: Offset(_shakeAnimation.value, 0),
+                              child: child,
+                            );
+                          },
+                          child: _buildTextField(
+                            key: _passwordFieldKey,
+                            controller: _passwordCtrl,
+                            hint: 'Masukkan kata sandi',
+                            obscureText: _obscurePassword,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: const Color(0xFF2E7D32),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
                           ),
                         ),
+                        
+                        // ✅ PASSWORD REQUIREMENTS INDICATOR
+                        _buildPasswordRequirements(passwordValidation, isStrongPassword),
+                        
                         const SizedBox(height: 16),
 
                         // 4. Konfirmasi Kata Sandi
@@ -157,13 +367,15 @@ class _RegisterStep2State extends State<RegisterStep2> {
                         // Tombol Daftar
                         Center(
                           child: GestureDetector(
-                            onTap: () {
-                              _handleRegister();
-                            },
+                            onTap: (isStrongPassword && _confirmPasswordCtrl.text.isNotEmpty)
+                                ? _handleRegister
+                                : null,
                             child: Container(
                               height: 52,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2E7D32),
+                                color: (isStrongPassword && _confirmPasswordCtrl.text.isNotEmpty)
+                                    ? const Color(0xFF2E7D32)
+                                    : Colors.grey[400],
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
@@ -218,6 +430,7 @@ class _RegisterStep2State extends State<RegisterStep2> {
   }
 
   Widget _buildTextField({
+    Key? key,
     required TextEditingController controller,
     required String hint,
     TextInputType? keyboardType,
@@ -225,6 +438,7 @@ class _RegisterStep2State extends State<RegisterStep2> {
     Widget? suffixIcon,
   }) {
     return Container(
+      key: key,
       decoration: BoxDecoration(
         color: const Color(0xFFF1F8E9),
         borderRadius: BorderRadius.circular(12),
@@ -258,103 +472,76 @@ class _RegisterStep2State extends State<RegisterStep2> {
     );
   }
 
-  void _handleRegister() async {
-    // Validasi
-    if (_teleponCtrl.text.isEmpty) {
-      _showSnackBar('No telepon harus diisi');
-      return;
-    }
-    if (_emailCtrl.text.isEmpty || !_emailCtrl.text.contains('@')) {
-      _showSnackBar('Email tidak valid');
-      return;
-    }
-    if (_passwordCtrl.text.isEmpty || _passwordCtrl.text.length < 6) {
-      _showSnackBar('Password minimal 6 karakter');
-      return;
-    }
-    if (_passwordCtrl.text != _confirmPasswordCtrl.text) {
-      _showSnackBar('Password tidak cocok');
-      return;
-    }
-
-    // Show loading
-    _showLoading();
-
-    try {
-      // Prepare data
-      final requestData = {
-        'nama': widget.nama,
-        'email': _emailCtrl.text,
-        'password': _passwordCtrl.text,
-        'no_telepon': _teleponCtrl.text,
-        'jenis_kelamin': widget.gender,
-        'tanggal_lahir': widget.tglLahir != null
-            ? '${widget.tglLahir!.year}-${widget.tglLahir!.month.toString().padLeft(2, '0')}-${widget.tglLahir!.day.toString().padLeft(2, '0')}'
-            : null,
-        'alamat': widget.alamat,
-        'pekerjaan': widget.job,
-        'id_dinas': widget.dinasId != null ? int.parse(widget.dinasId!) : null,
-      };
-
-      // Hit API
-      final response = await http.post(
-        Uri.parse(ApiConfig.register),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(requestData),
-      );
-
-      final result = jsonDecode(response.body);
-
-      if (result['status'] == 'success') {
-        // ✅ DAPAT BARCODE ID DARI RESPONSE
-        final barcodeId = result['data']['barcode_id'];
-
-        _hideLoading();
-        _showSnackBar('Registrasi berhasil! Barcode: $barcodeId');
-
-        // Navigate to login atau OTP verification
-        Navigator.pushReplacementNamed(context, '/login');
-      } else {
-        _hideLoading();
-        _showSnackBar(result['message'] ?? 'Registrasi gagal');
-      }
-    } catch (e) {
-      _hideLoading();
-      _showSnackBar('Terjadi kesalahan: $e');
-    }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF2E7D32),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  // ✅ WIDGET PASSWORD REQUIREMENTS
+  Widget _buildPasswordRequirements(Map<String, bool> validation, bool isStrong) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isStrong ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isStrong ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Persyaratan Password:',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1B5E20),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildRequirementItem(
+            'Minimal 8 karakter',
+            validation['minLength']!,
+          ),
+          _buildRequirementItem(
+            'Huruf besar (A-Z)',
+            validation['hasUppercase']!,
+          ),
+          _buildRequirementItem(
+            'Huruf kecil (a-z)',
+            validation['hasLowercase']!,
+          ),
+          _buildRequirementItem(
+            'Angka (0-9)',
+            validation['hasNumber']!,
+          ),
+          _buildRequirementItem(
+            'Simbol (!@#\$%&*)',
+            validation['hasSymbol']!,
+          ),
+        ],
       ),
     );
   }
 
-  void _showLoading() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+  Widget _buildRequirementItem(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            isMet ? Icons.check_circle : Icons.circle_outlined,
+            size: 16,
+            color: isMet ? const Color(0xFF4CAF50) : Colors.grey[400],
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: isMet ? const Color(0xFF1B5E20) : Colors.grey[600],
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  void _hideLoading() {
-    Navigator.pop(context);
-  }
-
-  @override
-  void dispose() {
-    _teleponCtrl.dispose();
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
-    _confirmPasswordCtrl.dispose();
-    super.dispose();
   }
 }
