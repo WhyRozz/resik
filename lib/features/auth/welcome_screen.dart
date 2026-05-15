@@ -13,9 +13,9 @@ class WelcomeScreen extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF4CAF50),  // Hijau terang (atas)
-              Color(0xFF66BB6A),  // Hijau medium
-              Colors.white,       // Putih (bawah)
+              Color(0xFF4CAF50), // Hijau terang (atas)
+              Color(0xFF66BB6A), // Hijau medium
+              Colors.white, // Putih (bawah)
             ],
             stops: [0.0, 0.4, 1.0],
           ),
@@ -25,7 +25,7 @@ class WelcomeScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             // CENTER INI PENTING: Supaya isi layar nempel ke tengah
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center, 
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // 1. Judul
                 const Text(
@@ -37,9 +37,9 @@ class WelcomeScreen extends StatelessWidget {
                     fontFamily: 'Montserrat',
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // 2. Ilustrasi
                 Image.asset(
                   'assets/images/welcome-screen.png',
@@ -53,9 +53,10 @@ class WelcomeScreen extends StatelessWidget {
                     );
                   },
                 ),
-                
-                const SizedBox(height: 144), // Jarak ke card (tidak terlalu jauh)
-                
+
+                const SizedBox(
+                  height: 144,
+                ), // Jarak ke card (tidak terlalu jauh)
                 // 3. Card Deskripsi
                 Container(
                   width: double.infinity,
@@ -73,7 +74,7 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                   child: const Text(
                     'Jaga bumi lebih mudah dengan RESIK. Pilih sampah secara cerdas dan berikan kontribusi nyata bagi alam. Mari bersiki bersama wujudkan Nganjuk yang bersih, hijau, dan lestari demi masa depan.',
-                    textAlign: TextAlign.center,
+                    textAlign: TextAlign.justify,
                     style: TextStyle(
                       fontSize: 14,
                       color: Color(0xFF1B5E20),
@@ -82,9 +83,8 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 24), // Jarak ke tombol
-                
                 // 4. Tombol Mulai
                 Container(
                   width: double.infinity,

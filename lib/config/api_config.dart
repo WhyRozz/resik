@@ -1,6 +1,6 @@
 class ApiConfig {
-  static const String baseUrl = 'http://172.16.103.232:8000/api';
-  static const String storageUrl = 'http://172.16.103.232:8000/storage';
+  static const String baseUrl = 'http://192.168.18.245:8000/api';
+  static const String storageUrl = 'http://192.168.18.245:8000/storage';
 
   static Map<String, String> get headers => {
     'Content-Type': 'application/json',
