@@ -697,6 +697,7 @@ class _LaporanScreenState extends State<LaporanScreen> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
                       ),
