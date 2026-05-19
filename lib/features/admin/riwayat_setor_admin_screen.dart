@@ -504,6 +504,39 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
       ),
       body: Column(
         children: [
+          // ✅ BUBBLE TABS
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildBubble(
+                    'Riwayat Setor',
+                    Icons.upload_rounded,
+                    _activeBubble == 'setor',
+                    () => setState(() => _activeBubble = 'setor'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildBubble(
+                    'Riwayat Penjemputan',
+                    Icons.local_shipping,
+                    _activeBubble == 'penjemputan',
+                    () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RiwayatPenjemputanAdminScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
           // ✅ STATISTICS CARDS
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -552,39 +585,6 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
             ),
           ),
 
-          // ✅ BUBBLE TABS
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildBubble(
-                    'Riwayat Setor',
-                    Icons.upload_rounded,
-                    _activeBubble == 'setor',
-                    () => setState(() => _activeBubble = 'setor'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildBubble(
-                    'Riwayat Penjemputan',
-                    Icons.local_shipping,
-                    _activeBubble == 'penjemputan',
-                    () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const RiwayatPenjemputanAdminScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
 
           // ✅ TRANSACTION LIST
           // ✅ TRANSACTION LIST

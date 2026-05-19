@@ -20,7 +20,7 @@ class ArtikelDetailScreen extends StatelessWidget {
             // Gambar
             if (artikel['foto'] != null)
               Image.network(
-                '${ApiConfig.storageUrl}/${artikel['foto']}',
+                ApiConfig.imageUrl(artikel['foto']),
                 width: double.infinity,
                 height: 200,
                 fit: BoxFit.cover,

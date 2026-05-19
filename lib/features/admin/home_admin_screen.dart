@@ -742,7 +742,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
                       top: Radius.circular(12),
                     ),
                     child: Image.network(
-                      '${ApiConfig.storageUrl}/${artikel['foto']}',
+                      ApiConfig.imageUrl(artikel['foto']),
                       height: 120,
                       width: double.infinity,
                       fit: BoxFit.cover,

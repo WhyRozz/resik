@@ -20,8 +20,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic> _userData = {};
 
   final _picker = ImagePicker();
-  File? _profileImageFile; // ✅ Untuk simpan foto yang dipilih
-  String? _selectedImagePath; // ✅ Untuk preview (network/file)
+  File? _profileImageFile;
+  String? _selectedImagePath;
 
   final _namaCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -32,6 +32,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _isLoading = true;
   bool _isSaving = false;
+
+  // ✅ HELPER: Build URL gambar yang aman
+  String _getFotoUrl(String? path) {
+    return ApiConfig.imageUrl(path);
+  }
 
   @override
   void initState() {
@@ -50,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (picked != null && mounted) {
       setState(() {
         _profileImageFile = File(picked.path);
-        _selectedImagePath = picked.path; // Untuk preview lokal
+        _selectedImagePath = picked.path;
       });
     }
   }
@@ -67,7 +72,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _tglLahirCtrl.text = _userData['tanggal_lahir'] ?? '';
         _alamatCtrl.text = _userData['alamat'] ?? '';
 
-        // Mapping tipe ke nama pekerjaan yang readable
         final tipe = _userData['tipe'] ?? _userData['role'] ?? '';
         _pekerjaanCtrl.text = tipe == 'pns' ? 'PNS / ASN' : 'Masyarakat Umum';
 
@@ -83,7 +87,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isSaving = true);
 
     try {
-      // ✅ DEBUG LOG
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
       debugPrint("📤 Request URL: ${ApiConfig.profileUpdate}");
       debugPrint(
         "📤 User ID: ${_userData['id_masyarakat'] ?? _userData['id_pns']}",
@@ -96,8 +102,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Uri.parse(ApiConfig.profileUpdate),
         );
 
-        // ✅ WAJIB: Tambah header ini agar Laravel return JSON, bukan HTML redirect
         request.headers['Accept'] = 'application/json';
+
+        // ✅ TAMBAH: Authorization header
+        if (token != null && token.isNotEmpty) {
+          request.headers['Authorization'] = 'Bearer $token';
+        }
 
         request.fields['user_id'] =
             (_userData['id_masyarakat'] ?? _userData['id_pns']).toString();
@@ -129,7 +139,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         debugPrint("📥 Status Code: ${response.statusCode}");
         debugPrint("📥 Headers: ${response.headers}");
 
-        // ✅ FIX: Cek panjang string dulu sebelum substring
         final bodyPreview = response.body.length > 200
             ? response.body.substring(0, 200)
             : response.body;
@@ -139,7 +148,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           debugPrint("⚠️ Redirect Location: ${response.headers['location']}");
         }
 
-        // ✅ FIX: Handle 401 Unauthorized khusus
         if (response.statusCode == 401) {
           debugPrint("❌ 401 Unauthorized - Backend minta token!");
           debugPrint(
@@ -149,10 +157,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         _handleSaveResponse(response);
       } else {
-        // ✅ Jika tidak ada foto baru, pakai JSON biasa
+        final headers = {'Content-Type': 'application/json'};
+
+        // ✅ TAMBAH: Authorization header untuk JSON request juga
+        if (token != null && token.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $token';
+        }
+
         final response = await http.put(
           Uri.parse(ApiConfig.profileUpdate),
-          headers: {'Content-Type': 'application/json'},
+          headers: headers,
           body: jsonEncode({
             'user_id': _userData['id_masyarakat'] ?? _userData['id_pns'],
             'tipe': _userData['tipe'],
@@ -182,11 +196,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
-    // 1. Ambil token dulu
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
-    // 2. Hubungi Laravel untuk invalidate token (Opsional tapi sangat disarankan)
     if (token != null && token.isNotEmpty) {
       try {
         await http
@@ -202,28 +214,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         debugPrint('✅ Token berhasil di-revoke di server');
       } catch (e) {
         debugPrint('️ Gagal logout di server (lanjut hapus lokal): $e');
-        // Lanjutkan proses logout lokal meski request ke server gagal
       }
     }
 
-    // 3. Hapus semua data lokal
     await prefs.clear();
 
-    // 4. Navigasi aman ke LoginScreen
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false, // Hapus semua halaman sebelumnya
+        (route) => false,
       );
     }
   }
 
-  // ✅ HELPER: Handle response dari server (untuk avoid code duplication)
   void _handleSaveResponse(http.Response response) async {
     setState(() => _isSaving = false);
 
-    // ✅ Handle Validation Error (422)
     if (response.statusCode == 422) {
       try {
         final errorData = jsonDecode(response.body);
@@ -257,7 +264,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    // ✅ Handle Server Error (bukan 200)
     if (response.statusCode != 200) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -270,39 +276,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    // ✅ Parse JSON Response
     try {
       final result = jsonDecode(response.body);
 
       if (mounted) {
         if (result['status'] == 'success') {
-          // ✅ AUTO-REFRESH: Update local data
           final updatedData = {
             ..._userData,
             'nama': _namaCtrl.text,
             'no_telepon': _telpCtrl.text,
             'tanggal_lahir': _tglLahirCtrl.text,
             'alamat': _alamatCtrl.text,
-
-            // ✅ PENTING: Ambil foto dari response, fallback ke foto lama
             'foto': result['data']?['foto'] ?? _userData['foto'],
           };
 
-          // Debug: Cek URL foto yang diterima
           debugPrint("📸 Foto URL dari server: ${updatedData['foto']}");
 
-          // Simpan ke SharedPreferences
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('user_data', jsonEncode(updatedData));
 
-          // Update state agar UI langsung refresh
           setState(() {
             _userData = updatedData;
             _profileImageFile = null;
             _selectedImagePath = null;
           });
 
-          // ✅ Tampilkan success message
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Profil berhasil diupdate!'),
@@ -310,10 +308,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           );
 
-          // ✅ Kembali ke halaman sebelumnya
           Navigator.pop(context, true);
         } else {
-          // ✅ Handle error dari response JSON
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result['message'] ?? 'Gagal update profil'),
@@ -323,7 +319,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     } catch (e) {
-      // ✅ Handle JSON parse error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -346,7 +341,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  // 🎨 Widget Input Field Custom
   Widget _buildField({
     required String label,
     required TextEditingController controller,
@@ -441,6 +435,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   const SizedBox(height: 20),
 
+                  // ✅ FIX: Stack dengan CircleAvatar saja (tanpa Positioned.fill)
                   Stack(
                     alignment: Alignment.bottomRight,
                     children: [
@@ -449,12 +444,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: CircleAvatar(
                           radius: 55,
                           backgroundColor: Colors.white,
-                          // ✅ PRIORITAS: File lokal > Network URL > Default icon
+                          // ✅ FIX: Pakai helper _getFotoUrl()
                           backgroundImage: _profileImageFile != null
                               ? FileImage(_profileImageFile!)
                               : (_userData['foto'] != null &&
                                         _userData['foto'].toString().isNotEmpty
-                                    ? NetworkImage(_userData['foto'].toString())
+                                    ? NetworkImage(
+                                        _getFotoUrl(_userData['foto']),
+                                      )
                                     : null),
                           child:
                               (_profileImageFile == null &&
@@ -469,33 +466,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-                      // ✅ Tambah error handling dengan Image.network widget terpisah untuk debug
-                      if (_userData['foto'] != null &&
-                          _profileImageFile == null)
-                        Positioned.fill(
-                          child: Image.network(
-                            _userData['foto'].toString(),
-                            fit: BoxFit.cover,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              debugPrint("❌ Error load gambar profil: $error");
-                              debugPrint("🔗 URL: ${_userData['foto']}");
-                              return const Icon(
-                                Icons.person,
-                                size: 60,
-                                color: Color(0xFF1B5E20),
-                              );
-                            },
-                          ),
-                        ),
-
+                      // ✅ HAPUS: Positioned.fill Image.network (redundan)
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: const BoxDecoration(
@@ -512,7 +483,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 30),
 
-                  // 📝 Form Fields
                   _buildField(label: 'Nama', controller: _namaCtrl),
                   _buildField(
                     label: 'Email',
@@ -538,7 +508,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 20),
 
-                  // 🔘 Buttons
                   Row(
                     children: [
                       Expanded(
