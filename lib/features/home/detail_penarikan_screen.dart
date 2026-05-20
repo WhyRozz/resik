@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:intl/intl.dart';
 
 class DetailPenarikanScreen extends StatefulWidget {
   // ✅ TIDAK PERLU PARAMETER!
@@ -13,6 +14,55 @@ class DetailPenarikanScreen extends StatefulWidget {
 class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
   Map<String, dynamic>? _penarikanData;
   bool _isLoading = true;
+
+  // ✅ FORMAT WIB LANGSUNG - TANPA KONVERSI!
+  String _formatWIBFromString(dynamic value) {
+    if (value == null || value.toString().isEmpty) {
+      return '-';
+    }
+
+    try {
+      final String str = value.toString();
+      debugPrint("🕐 Raw tanggal: $str");
+
+      DateTime dt;
+
+      // ✅ HANDLE SEMUA FORMAT YANG MUNGKIN:
+
+      // Format 1: "dd-MM-yyyy HH:mm" (contoh: 20-05-2026 03:29)
+      if (RegExp(r'^\d{2}-\d{2}-\d{4} \d{2}:\d{2}$').hasMatch(str)) {
+        dt = DateFormat('dd-MM-yyyy HH:mm').parse(str);
+      }
+      // Format 2: "yyyy-MM-dd HH:mm:ss" (contoh: 2026-05-20 14:30:00)
+      else if (RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$').hasMatch(str)) {
+        dt = DateFormat('yyyy-MM-dd HH:mm:ss').parse(str);
+      }
+      // Format 3: "yyyy-MM-dd HH:mm" (contoh: 2026-05-20 14:30)
+      else if (RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$').hasMatch(str)) {
+        dt = DateFormat('yyyy-MM-dd HH:mm').parse(str);
+      }
+      // Format 4: ISO string dengan Z (UTC)
+      else if (str.endsWith('Z')) {
+        dt = DateTime.parse(str).add(const Duration(hours: 7));
+      }
+      // Format 5: ISO string tanpa Z
+      else if (str.contains('T')) {
+        dt = DateTime.parse(str);
+      }
+      // Fallback: parse langsung
+      else {
+        dt = DateTime.parse(str);
+      }
+
+      // Format untuk tampilan
+      final formatted = DateFormat('dd MMM yyyy, HH:mm').format(dt);
+      debugPrint("✅ Format WIB: $formatted");
+      return formatted;
+    } catch (e) {
+      debugPrint("❌ Error parsing tanggal: $e | Value: $value");
+      return value.toString();
+    }
+  }
 
   @override
   void initState() {
@@ -27,8 +77,41 @@ class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
 
     if (mounted) {
       if (dataStr != null) {
+        final data = jsonDecode(dataStr);
+
+        debugPrint(
+          "🔍 Raw nama from storage: '${data['nama']}' (type: ${data['nama']?.runtimeType})",
+        );
+
+        // ✅ FIX: Jika nama kosong/null, ambil dari user_data SharedPreferences
+        if (data['nama'] == null ||
+            data['nama'].toString().trim().isEmpty ||
+            data['nama'].toString().toLowerCase() == 'null' ||
+            data['nama'].toString() == '-' ||
+            data['nama'].toString() == 'User') {
+          final userDataStr = prefs.getString('user_data');
+
+          if (userDataStr != null) {
+            try {
+              final userData = jsonDecode(userDataStr);
+              data['nama'] = userData['nama'] ?? 'User';
+
+              final fallbackNama = userData['nama']?.toString()?.trim();
+              if (fallbackNama != null && fallbackNama.isNotEmpty) {
+                data['nama'] = fallbackNama;
+                debugPrint("✅ Fallback sukses: nama = '${data['nama']}'");
+              }
+
+              // Debug log
+              debugPrint("🔄 Nama fallback dari user_data: ${data['nama']}");
+            } catch (e) {
+              debugPrint("❌ Gagal parse user_data: $e");
+            }
+          }
+        }
+
         setState(() {
-          _penarikanData = jsonDecode(dataStr);
+          _penarikanData = data;
           _isLoading = false;
         });
       } else {
@@ -42,6 +125,12 @@ class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
     // ✅ LOADING STATE
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_penarikanData != null) {
+      debugPrint("🔍 Detail Penarikan Debug:");
+      debugPrint("   nama: '${_penarikanData!['nama']}'");
+      debugPrint("   status: '${_penarikanData!['status']}'");
     }
 
     // ✅ EMPTY STATE
@@ -75,8 +164,9 @@ class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
     final String idTransaksi = '#TRX-${idPenarikan.toString().padLeft(5, '0')}';
 
     final String status = (_penarikanData!['status'] ?? 'Unknown').toString();
-    final String tanggal = (_penarikanData!['tanggal_penarikan'] ?? '-')
-        .toString();
+    final String tanggal = _formatWIBFromString(
+      _penarikanData!['tanggal_penarikan'],
+    );
     final String jenisEWallet = (_penarikanData!['jenis_ewallet'] ?? '-')
         .toString();
     final String nomorEWallet = (_penarikanData!['nomor_ewallet'] ?? '-')

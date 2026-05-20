@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../../config/api_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -77,6 +78,13 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString('user_type', tipe);
         await prefs.setString('user_data', jsonEncode(userData));
         await prefs.setBool('is_logged_in', true);
+        final now = DateTime.now();
+
+        await prefs.setInt('login_timestamp', now.millisecondsSinceEpoch);
+        await prefs.setString(
+          'login_date',
+          DateFormat('yyyy-MM-dd').format(now),
+        );
 
         debugPrint("✅ Login sukses! Tipe: $tipe, User ID: $userId");
 

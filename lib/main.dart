@@ -11,8 +11,13 @@ import 'features/home/home_user_screen.dart';
 import 'features/admin/home_admin_screen.dart';
 import 'package:provider/provider.dart';
 import 'providers/statistik_provider.dart';
+import 'services/session_manager.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SessionManager().init(navigatorKey);
   runApp(
     ChangeNotifierProvider(
       create: (_) => StatistikProvider(),
@@ -27,6 +32,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'RESIK',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.green, fontFamily: 'Montserrat'),

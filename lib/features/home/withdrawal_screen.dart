@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
+import 'package:intl/intl.dart';
 
 class WithdrawalScreen extends StatefulWidget {
   const WithdrawalScreen({super.key});
@@ -103,6 +104,37 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
             setState(() => _isLoading = false);
 
             if (result['status'] == 'success') {
+              final prefs = await SharedPreferences.getInstance();
+
+              debugPrint("💾 DEBUG SAVE:");
+              debugPrint("   _namaCtrl.text: '${_namaCtrl.text}'");
+              debugPrint("   _userData?['nama']: '${_userData?['nama']}'");
+
+              final penarikanData = {
+                'id_penarikan': result['data']?['id'],
+                'id': result['data']?['id'], // fallback key
+                'nama':
+                    _namaCtrl.text, // ✅ Ambil nama dari form (yang user input)
+                'jenis_ewallet': _selectedEWallet,
+                'nomor_ewallet': _nomorEWalletCtrl.text,
+                'jumlah_uang': jumlahUang,
+                'status': result['data']?['status'] ?? 'Diproses',
+                'tanggal_penarikan': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+                'alasan_penolakan': result['data']?['alasan_penolakan'],
+                'tanggal_disetujui': result['data']?['tanggal_disetujui'],
+              };
+
+              debugPrint("💾 Data to save: ${jsonEncode(penarikanData)}");
+
+              await prefs.setString(
+                'last_penarikan_detail',
+                jsonEncode(penarikanData),
+              );
+
+              final verify = prefs.getString('last_penarikan_detail');
+              debugPrint("💾 Verified saved: $verify");
+              
+
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(

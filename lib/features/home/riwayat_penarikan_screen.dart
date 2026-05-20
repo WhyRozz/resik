@@ -8,6 +8,7 @@ import 'riwayat_setor_screen.dart';
 import 'home_user_screen.dart';
 import 'laporan_screen.dart';
 import 'info_tps_screen.dart';
+import 'package:intl/intl.dart';
 
 class RiwayatPenarikanScreen extends StatefulWidget {
   const RiwayatPenarikanScreen({super.key});
@@ -21,6 +22,55 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   String _filterStatus = 'all';
+
+  // ✅ FORMAT WIB LANGSUNG - TANPA KONVERSI!
+  String _formatWIBFromString(dynamic value) {
+    if (value == null || value.toString().isEmpty) {
+      return '-';
+    }
+
+    try {
+      final String str = value.toString();
+      debugPrint("🕐 Raw tanggal: $str");
+
+      DateTime dt;
+
+      // ✅ HANDLE SEMUA FORMAT YANG MUNGKIN:
+
+      // Format 1: "dd-MM-yyyy HH:mm" (contoh: 20-05-2026 03:29)
+      if (RegExp(r'^\d{2}-\d{2}-\d{4} \d{2}:\d{2}$').hasMatch(str)) {
+        dt = DateFormat('dd-MM-yyyy HH:mm').parse(str);
+      }
+      // Format 2: "yyyy-MM-dd HH:mm:ss" (contoh: 2026-05-20 14:30:00)
+      else if (RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$').hasMatch(str)) {
+        dt = DateFormat('yyyy-MM-dd HH:mm:ss').parse(str);
+      }
+      // Format 3: "yyyy-MM-dd HH:mm" (contoh: 2026-05-20 14:30)
+      else if (RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$').hasMatch(str)) {
+        dt = DateFormat('yyyy-MM-dd HH:mm').parse(str);
+      }
+      // Format 4: ISO string dengan Z (UTC)
+      else if (str.endsWith('Z')) {
+        dt = DateTime.parse(str).add(const Duration(hours: 7));
+      }
+      // Format 5: ISO string tanpa Z
+      else if (str.contains('T')) {
+        dt = DateTime.parse(str);
+      }
+      // Fallback: parse langsung
+      else {
+        dt = DateTime.parse(str);
+      }
+
+      // Format untuk tampilan
+      final formatted = DateFormat('dd MMM yyyy, HH:mm').format(dt);
+      debugPrint("✅ Format WIB: $formatted");
+      return formatted;
+    } catch (e) {
+      debugPrint("❌ Error parsing tanggal: $e | Value: $value");
+      return value.toString();
+    }
+  }
 
   @override
   void initState() {
@@ -251,10 +301,10 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildBubble(
-                    'Riwayat Penarikan', 
-                    Icons.download, 
-                    true, 
-                    () {}, 
+                    'Riwayat Penarikan',
+                    Icons.download,
+                    true,
+                    () {},
                   ),
                 ),
               ],
@@ -450,7 +500,7 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
   // ✅ CARD PENARIKAN (BISA DIKLIK KE DETAIL)
   Widget _buildPenarikanCard(Map<String, dynamic> data) {
     final String status = (data['status'] ?? 'Unknown').toString();
-    final String tanggal = (data['tanggal_penarikan'] ?? '-').toString();
+    final String tanggal = _formatWIBFromString(data['tanggal_penarikan']);
     final String jenisEWallet = (data['jenis_ewallet'] ?? '-').toString();
     final String nomorEWallet = (data['nomor_ewallet'] ?? '-').toString();
     final double jumlahUang = (data['jumlah_uang'] ?? 0).toDouble();
