@@ -19,13 +19,13 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
   final _nominalCtrl = TextEditingController();
 
   String? _selectedEWallet;
-  bool _isLoading = false;        // ✅ TAMBAH INI (untuk loading button)
-  bool _isLoadingSaldo = true;    // ✅ Sudah ada
+  bool _isLoading = false; // ✅ TAMBAH INI (untuk loading button)
+  bool _isLoadingSaldo = true; // ✅ Sudah ada
   Map<String, dynamic>? _userData;
 
   // ✅ TAMBAH: Variabel angka untuk kalkulasi
-  double _saldo = 0.0;            
-  String _saldoText = "Rp 0";     // ✅ Sudah ada (untuk display)
+  double _saldo = 0.0;
+  String _saldoText = "Rp 0"; // ✅ Sudah ada (untuk display)
 
   final List<String> _eWalletOptions = ['Dana', 'OVO', 'GoPay', 'ShopeePay'];
 
@@ -86,6 +86,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                 setState(() {
                   // Format saldo: hapus .00 jika bilangan bulat
                   _saldoText = "Rp ${saldo.toStringAsFixed(0)}";
+                  _saldo = saldo.toDouble();
                   _isLoadingSaldo = false;
                 });
               }
