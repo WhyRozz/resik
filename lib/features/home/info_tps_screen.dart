@@ -26,6 +26,11 @@ class _InfoTpsScreenState extends State<InfoTpsScreen> {
     _fetchTpsData();
   }
 
+  // ✅ HANDLE PULL-TO-REFRESH
+  Future<void> _handleRefresh() async {
+    await _fetchTpsData();
+  }
+
   Future<void> _fetchTpsData() async {
     setState(() {
       _isLoading = true;
@@ -85,7 +90,10 @@ class _InfoTpsScreenState extends State<InfoTpsScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeUserScreen()),
+          ),
         ),
         title: const Text(
           'Informasi Lokasi TPS',
@@ -120,61 +128,67 @@ class _InfoTpsScreenState extends State<InfoTpsScreen> {
             ),
           ),
 
-          // ✅ LIST TPS
+          
+          // ✅ LIST TPS dengan PULL-TO-REFRESH
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _fetchTpsData,
-                          child: const Text('Coba Lagi'),
-                        ),
-                      ],
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              color: const Color(0xFF4CAF50),
+              backgroundColor: Colors.white,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _errorMessage!,
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchTpsData,
+                            child: const Text('Coba Lagi'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _filteredTps.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.location_off,
+                            size: 80,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'TPS tidak ditemukan',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _filteredTps.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final tps = _filteredTps[index];
+                        return _buildTpsCard(tps);
+                      },
                     ),
-                  )
-                : _filteredTps.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.location_off,
-                          size: 80,
-                          color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'TPS tidak ditemukan',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _filteredTps.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final tps = _filteredTps[index];
-                      return _buildTpsCard(tps);
-                    },
-                  ),
+            ),
           ),
 
           // ✅ BOTTOM NAVIGATION

@@ -298,8 +298,10 @@ class _LaporanScreenState extends State<LaporanScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RiwayatLaporanScreen()),
+                );
             },
             child: const Text(
               'OK',
@@ -503,7 +505,10 @@ class _LaporanScreenState extends State<LaporanScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HomeUserScreen()),
+                ),
         ),
         title: const Text(
           'Pengajuan Laporan',

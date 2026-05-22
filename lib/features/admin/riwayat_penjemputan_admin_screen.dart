@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:resik/features/admin/qr_barcode_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/api_config.dart';
 import 'home_admin_screen.dart';
@@ -26,6 +27,11 @@ class _RiwayatPenjemputanAdminScreenState
   void initState() {
     super.initState();
     _fetchRiwayatPenjemputan();
+  }
+
+  // ✅ HANDLE PULL-TO-REFRESH
+  Future<void> _handleRefresh() async {
+    await _fetchRiwayatPenjemputan();
   }
 
   Future<void> _fetchRiwayatPenjemputan() async {
@@ -121,36 +127,41 @@ class _RiwayatPenjemputanAdminScreenState
             ),
           ),
 
-          // ✅ CONTENT
+          // ✅ CONTENT dengan PULL-TO-REFRESH
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _riwayatPenjemputan.isEmpty
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.local_shipping,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'Belum ada riwayat penjemputan',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              color: const Color(0xFF4CAF50),
+              backgroundColor: Colors.white,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _riwayatPenjemputan.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.local_shipping,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'Belum ada riwayat penjemputan',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _riwayatPenjemputan.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) =>
+                          _buildPenjemputanCard(_riwayatPenjemputan[index]),
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _riwayatPenjemputan.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (context, index) =>
-                        _buildPenjemputanCard(_riwayatPenjemputan[index]),
-                  ),
+            ),
           ),
 
           // ✅ BOTTOM NAVIGATION
@@ -365,6 +376,12 @@ class _RiwayatPenjemputanAdminScreenState
                 );
               } else if (index == 1) {
                 // Scan logic
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const QrBarcodeScreen(),
+                  ),
+                );
               } else if (index == 2) {
                 Navigator.push(
                   context,

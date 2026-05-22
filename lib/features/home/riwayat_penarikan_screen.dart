@@ -78,6 +78,11 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
     _fetchRiwayatPenarikan();
   }
 
+  // ✅ HANDLE PULL-TO-REFRESH
+  Future<void> _handleRefresh() async {
+    await _fetchRiwayatPenarikan();
+  }
+
   Future<void> _fetchRiwayatPenarikan() async {
     setState(() {
       _isLoading = true;
@@ -153,7 +158,10 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeUserScreen()),
+          ),
         ),
         title: const Text(
           'Riwayat Penarikan',
@@ -165,117 +173,123 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
         children: [
           // ✅ AREA LIST DATA (SCROLLABLE)
           Expanded(
-            child: Column(
-              children: [
-                // ✅ FILTER TABS
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.white,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _filterStatus = 'all'),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _filterStatus == 'all'
-                                  ? const Color(0xFF4CAF50)
-                                  : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Semua Transaksi',
-                                style: TextStyle(
-                                  color: _filterStatus == 'all'
-                                      ? Colors.white
-                                      : Colors.grey.shade700,
-                                  fontWeight: FontWeight.bold,
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              color: const Color(0xFF4CAF50),
+              backgroundColor: Colors.white,
+              child: Column(
+                children: [
+                  // ✅ FILTER TABS
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.white,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _filterStatus = 'all'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: _filterStatus == 'all'
+                                    ? const Color(0xFF4CAF50)
+                                    : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Semua Transaksi',
+                                  style: TextStyle(
+                                    color: _filterStatus == 'all'
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _filterStatus = 'proses'),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _filterStatus == 'proses'
-                                  ? const Color(0xFF4CAF50)
-                                  : Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Diproses',
-                                style: TextStyle(
-                                  color: _filterStatus == 'proses'
-                                      ? Colors.white
-                                      : Colors.grey.shade700,
-                                  fontWeight: FontWeight.bold,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () =>
+                                setState(() => _filterStatus = 'proses'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: _filterStatus == 'proses'
+                                    ? const Color(0xFF4CAF50)
+                                    : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Diproses',
+                                  style: TextStyle(
+                                    color: _filterStatus == 'proses'
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
-                // ✅ LIST DATA
-                Expanded(
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _errorMessage != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 64,
-                                color: Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _errorMessage!,
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _fetchRiwayatPenarikan,
-                                child: const Text('Coba Lagi'),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _riwayatData.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.history,
-                                size: 80,
-                                color: Colors.grey[300],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Belum ada riwayat penarikan',
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _buildFilteredList(),
-                ),
-              ],
+                  // ✅ LIST DATA
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _errorMessage != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _errorMessage!,
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _fetchRiwayatPenarikan,
+                                  child: const Text('Coba Lagi'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _riwayatData.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.history,
+                                  size: 80,
+                                  color: Colors.grey[300],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Belum ada riwayat penarikan',
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _buildFilteredList(),
+                  ),
+                ],
+              ),
             ),
           ),
 

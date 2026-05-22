@@ -22,6 +22,11 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
     _fetchArtikel();
   }
 
+  // ✅ HANDLE PULL-TO-REFRESH
+  Future<void> _handleRefresh() async {
+    await _fetchArtikel();
+  }
+
   Future<void> _fetchArtikel() async {
     setState(() => _isLoading = true);
     try {
@@ -100,39 +105,45 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
           ),
 
           // ✅ LIST ARTIKEL
+          // ✅ LIST ARTIKEL dengan PULL-TO-REFRESH
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredArtikel.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.article_outlined,
-                              size: 80,
-                              color: Colors.grey[300],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isEmpty
-                                  ? 'Belum ada artikel'
-                                  : 'Artikel tidak ditemukan',
-                              style: TextStyle(color: Colors.grey[600]),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _filteredArtikel.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final artikel = _filteredArtikel[index];
-                          return _buildArtikelCard(artikel);
-                        },
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              color: const Color(0xFF4CAF50),
+              backgroundColor: Colors.white,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredArtikel.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.article_outlined,
+                            size: 80,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _searchQuery.isEmpty
+                                ? 'Belum ada artikel'
+                                : 'Artikel tidak ditemukan',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
                       ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _filteredArtikel.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final artikel = _filteredArtikel[index];
+                        return _buildArtikelCard(artikel);
+                      },
+                    ),
+            ),
           ),
         ],
       ),
@@ -198,6 +209,7 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
+                  // ✅ HANYA TANGGAL PUBLIKASI
                   Row(
                     children: [
                       Icon(
@@ -207,24 +219,11 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        _formatDate(artikel['created_at']),
+                        _formatDate(artikel['tanggal']),
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.remove_red_eye,
-                        size: 12,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        artikel['views']?.toString() ?? '0',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -239,27 +238,76 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
   }
 
   // Format tanggal dari ISO string
-  String _formatDate(String? dateString) {
-    if (dateString == null) return '-';
+  String _formatDate(dynamic dateString) {
+    // ✅ Handle jika null atau kosong
+    if (dateString == null || dateString.toString().isEmpty) {
+      return '-';
+    }
+
+    // ✅ Jika sudah berupa string formatted (contoh: "19 May 2026"), langsung return
+    final dateStr = dateString.toString();
+
+    // ✅ Cek apakah sudah dalam format "dd MMM yyyy"
+    if (RegExp(
+      r'^\d{1,2}\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4}$',
+    ).hasMatch(dateStr)) {
+      return dateStr; // Sudah format yang benar
+    }
+
+    // ✅ Cek apakah sudah dalam format "dd MMM yyyy" (English)
+    if (RegExp(
+      r'^\d{1,2}\s+(Jan|Feb|Mar|Apr|Mei|Jun|Jul|Agu|Sep|Okt|Nov|Des)\s+\d{4}$',
+    ).hasMatch(dateStr)) {
+      return dateStr; // Sudah format yang benar
+    }
+
+    // ✅ Jika format ISO atau timestamp, parse dan format ulang
     try {
-      final date = DateTime.parse(dateString);
+      DateTime date;
+
+      // Format ISO (YYYY-MM-DD HH:MM:SS)
+      if (dateStr.contains(' ') || dateStr.contains('T')) {
+        date = DateTime.parse(dateStr);
+      }
+      // Format YYYY-MM-DD
+      else if (dateStr.contains('-')) {
+        final parts = dateStr.split('-');
+        if (parts.length == 3) {
+          date = DateTime(
+            int.parse(parts[0]),
+            int.parse(parts[1]),
+            int.parse(parts[2]),
+          );
+        } else {
+          return dateStr; // Return as-is jika tidak bisa parse
+        }
+      }
+      // Format timestamp
+      else if (int.tryParse(dateStr) != null) {
+        date = DateTime.fromMillisecondsSinceEpoch(int.parse(dateStr));
+      } else {
+        return dateStr; // Return as-is
+      }
+
       final months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
+        'Januari',
+        'Februari',
+        'Maret',
+        'April',
         'Mei',
-        'Jun',
-        'Jul',
-        'Agu',
-        'Sep',
-        'Okt',
-        'Nov',
-        'Des'
+        'Juni',
+        'Juli',
+        'Agustus',
+        'September',
+        'Oktober',
+        'November',
+        'Desember',
       ];
+
       return '${date.day} ${months[date.month - 1]} ${date.year}';
     } catch (e) {
-      return '-';
+      debugPrint("❌ Error formatting date: $e");
+      return dateStr; // Return original string jika error
     }
   }
 }

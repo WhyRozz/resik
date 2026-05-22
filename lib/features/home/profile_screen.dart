@@ -38,6 +38,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ApiConfig.imageUrl(path);
   }
 
+  // ✅ VALIDATOR: No Telepon Indonesia (format 08xxx)
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'No telepon tidak boleh kosong';
+    }
+
+    // Format Indonesia: 08xxx, panjang 10-13 digit
+    final phoneRegex = RegExp(r'^08[0-9]{8,11}$');
+    if (!phoneRegex.hasMatch(value.trim())) {
+      return 'Format no telepon tidak valid (contoh: 081234567890)';
+    }
+    return null;
+  }
+
+  // ✅ VALIDATOR: Alamat tidak boleh kosong
+  String? _validateAddress(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Alamat tidak boleh kosong';
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -347,6 +369,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bool readOnly = false,
     TextInputType? keyboardType,
     VoidCallback? onTap,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,6 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           readOnly: readOnly,
           keyboardType: keyboardType,
           onTap: onTap,
+          validator: validator,
           style: const TextStyle(
             fontSize: 14,
             color: Color(0xFF1B5E20),
@@ -493,13 +517,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     label: 'No Telp',
                     controller: _telpCtrl,
                     keyboardType: TextInputType.phone,
+                    validator: _validatePhone,
                   ),
                   _buildField(
                     label: 'Tanggal Lahir',
                     controller: _tglLahirCtrl,
                     readOnly: true,
                   ),
-                  _buildField(label: 'Alamat', controller: _alamatCtrl),
+                  _buildField(
+                    label: 'Alamat',
+                    controller: _alamatCtrl,
+                    validator: _validateAddress,
+                  ),
                   _buildField(
                     label: 'Pekerjaan',
                     controller: _pekerjaanCtrl,

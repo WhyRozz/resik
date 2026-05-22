@@ -21,6 +21,11 @@ class _JenisSampahListScreenState extends State<JenisSampahListScreen> {
     _fetchJenisSampah();
   }
 
+  // ✅ HANDLE PULL-TO-REFRESH
+  Future<void> _handleRefresh() async {
+    await _fetchJenisSampah();
+  }
+
   Future<void> _fetchJenisSampah() async {
     setState(() {
       _isLoading = true;
@@ -93,7 +98,9 @@ class _JenisSampahListScreenState extends State<JenisSampahListScreen> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF4CAF50)));
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF4CAF50)),
+      );
     }
 
     if (_errorMessage != null) {
@@ -113,7 +120,7 @@ class _JenisSampahListScreenState extends State<JenisSampahListScreen> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _fetchJenisSampah,
+              onPressed: _fetchJenisSampah, // ✅ Tetap bisa retry manual
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4CAF50),
                 foregroundColor: Colors.white,
@@ -141,19 +148,25 @@ class _JenisSampahListScreenState extends State<JenisSampahListScreen> {
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 0.85,
+    // ✅ WRAP DENGAN RefreshIndicator
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      color: const Color(0xFF4CAF50),
+      backgroundColor: Colors.white,
+      child: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 0.85,
+        ),
+        itemCount: _jenisSampahList.length,
+        itemBuilder: (context, index) {
+          final item = _jenisSampahList[index];
+          return _buildJenisSampahCard(item);
+        },
       ),
-      itemCount: _jenisSampahList.length,
-      itemBuilder: (context, index) {
-        final item = _jenisSampahList[index];
-        return _buildJenisSampahCard(item);
-      },
     );
   }
 
@@ -177,10 +190,12 @@ class _JenisSampahListScreenState extends State<JenisSampahListScreen> {
       'lainnya': Icons.category,
     };
     final iconKey = namaJenis.toLowerCase().replaceAll(' ', '');
-    final IconData icon = iconMap.entries.firstWhere(
-      (e) => iconKey.contains(e.key),
-      orElse: () => MapEntry('lainnya', Icons.category),
-    ).value;
+    final IconData icon = iconMap.entries
+        .firstWhere(
+          (e) => iconKey.contains(e.key),
+          orElse: () => MapEntry('lainnya', Icons.category),
+        )
+        .value;
 
     return Container(
       decoration: BoxDecoration(
@@ -211,7 +226,8 @@ class _JenisSampahListScreenState extends State<JenisSampahListScreen> {
                       width: 50,
                       height: 50,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(icon, size: 40, color: const Color(0xFF4CAF50)),
+                      errorBuilder: (_, __, ___) =>
+                          Icon(icon, size: 40, color: const Color(0xFF4CAF50)),
                     ),
                   )
                 : Icon(icon, size: 40, color: const Color(0xFF4CAF50)),

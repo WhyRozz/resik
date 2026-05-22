@@ -106,7 +106,10 @@ class _RiwayatLaporanScreenState extends State<RiwayatLaporanScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HomeUserScreen()),
+                ),
         ),
         title: const Text(
           'Cek Status Laporan',

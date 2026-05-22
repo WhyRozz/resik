@@ -19,8 +19,13 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
   final _nominalCtrl = TextEditingController();
 
   String? _selectedEWallet;
-  bool _isLoading = false;
+  bool _isLoading = false;        // ✅ TAMBAH INI (untuk loading button)
+  bool _isLoadingSaldo = true;    // ✅ Sudah ada
   Map<String, dynamic>? _userData;
+
+  // ✅ TAMBAH: Variabel angka untuk kalkulasi
+  double _saldo = 0.0;            
+  String _saldoText = "Rp 0";     // ✅ Sudah ada (untuk display)
 
   final List<String> _eWalletOptions = ['Dana', 'OVO', 'GoPay', 'ShopeePay'];
 
@@ -38,15 +43,90 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     super.dispose();
   }
 
+  // ✅ METHOD FETCH SALDO (sama seperti di dashboard)
+  Future<void> _fetchSaldo() async {
+    if (_userData == null) {
+      debugPrint("⚠️ _fetchSaldo: _userData masih null!");
+      return;
+    }
+
+    debugPrint("🔄 Fetching saldo untuk user: ${_userData!['nama']}");
+
+    try {
+      final userId = (_userData!['id_masyarakat'] ?? _userData!['id_pns'])
+          .toString();
+      final userType = _userData!['tipe'];
+
+      final uri = Uri.parse(
+        ApiConfig.getSaldo,
+      ).replace(queryParameters: {'user_id': userId, 'tipe': userType});
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      debugPrint("📥 Status Code: ${response.statusCode}");
+      debugPrint("📄 RAW Response Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        try {
+          final result = jsonDecode(response.body);
+          debugPrint("🔍 Parsed Result: $result");
+
+          if (mounted) {
+            if (result['status'] == 'success') {
+              final data = result['data'];
+
+              if (data.containsKey('saldo')) {
+                final saldoRaw = data['saldo'];
+                final saldo = saldoRaw is num
+                    ? saldoRaw
+                    : double.tryParse(saldoRaw.toString()) ?? 0;
+
+                debugPrint("✅ Saldo: $saldo");
+
+                setState(() {
+                  // Format saldo: hapus .00 jika bilangan bulat
+                  _saldoText = "Rp ${saldo.toStringAsFixed(0)}";
+                  _isLoadingSaldo = false;
+                });
+              }
+            }
+          }
+        } catch (jsonError) {
+          debugPrint("🚨 JSON Decode Error: $jsonError");
+        }
+      }
+    } catch (e) {
+      debugPrint("🚨 Exception: $e");
+    }
+  }
+
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final userData = prefs.getString('user_data');
+
     if (userData != null && mounted) {
       setState(() {
         _userData = jsonDecode(userData);
         _namaCtrl.text = _userData?['nama'] ?? '';
       });
+
+      // ✅ FETCH SALDO SETELAH USER DATA LOAD
+      _fetchSaldo();
     }
+  }
+
+  // ✅ VALIDATOR: Nomor E-Wallet Indonesia
+  String? _validateEWalletNumber(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Nomor e-wallet tidak boleh kosong';
+    }
+
+    // Format Indonesia: 08xxx, 10-13 digit
+    final phoneRegex = RegExp(r'^08[0-9]{8,11}$');
+    if (!phoneRegex.hasMatch(value.trim())) {
+      return 'Format nomor tidak valid (contoh: 081234567890)';
+    }
+    return null;
   }
 
   Future<void> _submitWithdrawal() async {
@@ -62,15 +142,63 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
       return;
     }
 
+    final nominalRaw = _nominalCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
+    final jumlahUang = double.tryParse(nominalRaw) ?? 0;
+
+    // ✅ CEK SALDO CUKUP ATAU TIDAK
+    if (jumlahUang > _saldo) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Saldo Tidak Mencukupi',
+                  style: TextStyle(color: Color(0xFF1B5E20)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Maaf, saldo Anda tidak mencukupi untuk penarikan ini.',
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Tutup',
+                style: TextStyle(
+                  color: Color(0xFF4CAF50),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
       final tipeUser = _userData!['tipe'];
       final userId = _userData!['id_masyarakat'] ?? _userData!['id_pns'];
-      final nominalRaw = _nominalCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
-      final jumlahUang = double.tryParse(nominalRaw) ?? 0;
 
-      // ✅ DEBUG: Print request yang dikirim
       debugPrint("📤 Request URL: ${ApiConfig.penarikanStore}");
       debugPrint(
         "📤 Request Body: ${jsonEncode({'id_masyarakat': tipeUser == 'masyarakat' ? userId : null, 'id_pns': tipeUser == 'pns' ? userId : null, 'tipe_user': tipeUser, 'nama': _namaCtrl.text, 'jenis_ewallet': _selectedEWallet, 'nomor_ewallet': _nomorEWalletCtrl.text, 'jumlah_uang': jumlahUang})}",
@@ -92,7 +220,6 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
           )
           .timeout(const Duration(seconds: 30));
 
-      // ✅ DEBUG: Print response mentah
       debugPrint("📥 Status Code: ${response.statusCode}");
       debugPrint("📥 RAW Response: ${response.body}");
 
@@ -106,34 +233,29 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
             if (result['status'] == 'success') {
               final prefs = await SharedPreferences.getInstance();
 
-              debugPrint("💾 DEBUG SAVE:");
-              debugPrint("   _namaCtrl.text: '${_namaCtrl.text}'");
-              debugPrint("   _userData?['nama']: '${_userData?['nama']}'");
-
               final penarikanData = {
                 'id_penarikan': result['data']?['id'],
-                'id': result['data']?['id'], // fallback key
-                'nama':
-                    _namaCtrl.text, // ✅ Ambil nama dari form (yang user input)
+                'id': result['data']?['id'],
+                'nama': _namaCtrl.text,
                 'jenis_ewallet': _selectedEWallet,
                 'nomor_ewallet': _nomorEWalletCtrl.text,
                 'jumlah_uang': jumlahUang,
                 'status': result['data']?['status'] ?? 'Diproses',
-                'tanggal_penarikan': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+                'tanggal_penarikan': DateFormat(
+                  'yyyy-MM-dd HH:mm:ss',
+                ).format(DateTime.now()),
                 'alasan_penolakan': result['data']?['alasan_penolakan'],
                 'tanggal_disetujui': result['data']?['tanggal_disetujui'],
               };
-
-              debugPrint("💾 Data to save: ${jsonEncode(penarikanData)}");
 
               await prefs.setString(
                 'last_penarikan_detail',
                 jsonEncode(penarikanData),
               );
 
-              final verify = prefs.getString('last_penarikan_detail');
-              debugPrint("💾 Verified saved: $verify");
-              
+              // ✅ Update saldo di SharedPreferences
+              final newSaldo = _saldo - jumlahUang;
+              await prefs.setDouble('saldo', newSaldo);
 
               showDialog(
                 context: context,
@@ -141,12 +263,12 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  title: const Row(
+                  title: Row(
                     children: [
                       Icon(
                         Icons.check_circle,
                         color: Color(0xFF2E7D32),
-                        size: 32,
+                        size: 28,
                       ),
                       SizedBox(width: 8),
                       Text(
@@ -155,7 +277,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                       ),
                     ],
                   ),
-                  content: const Text(
+                  content: Text(
                     'Pengajuan penarikan berhasil diajukan.\n\n'
                     '💰 Saldo Anda telah dikurangi\n'
                     '⏰ Dana akan ditransfer dalam 1-3 hari kerja\n'
@@ -164,10 +286,10 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                   actions: [
                     TextButton(
                       onPressed: () {
-                        Navigator.pop(context); // Close dialog
-                        Navigator.pop(context); // Back to previous screen
+                        Navigator.pop(context);
+                        Navigator.pop(context);
                       },
-                      child: const Text(
+                      child: Text(
                         'OK',
                         style: TextStyle(
                           color: Color(0xFF4CAF50),
@@ -231,13 +353,13 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF4CAF50),
+        backgroundColor: Color(0xFF4CAF50),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Pengajuan Penarikan',
           style: TextStyle(
             color: Colors.white,
@@ -248,7 +370,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
         ),
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -258,23 +380,24 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
         child: SafeArea(
           child: Column(
             children: [
+              // Ilustrasi
               Container(
-                margin: const EdgeInsets.only(top: 20),
+                margin: EdgeInsets.only(top: 20),
                 child: Image.asset(
                   'assets/images/penarikan-pict.png',
-                  height: 150,
+                  height: 120,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
-                      height: 150,
-                      margin: const EdgeInsets.symmetric(horizontal: 40),
+                      height: 120,
+                      margin: EdgeInsets.symmetric(horizontal: 40),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Column(
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.money, size: 80, color: Colors.white),
+                          Icon(Icons.money, size: 60, color: Colors.white),
                           SizedBox(height: 8),
                           Text(
                             'Ilustrasi Penarikan',
@@ -286,11 +409,76 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                   },
                 ),
               ),
+
+              // ✅ SALDO CARD - Tampilkan saldo aktual
+              // ✅ SALDO CARD - dengan loading state
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Saldo Tersedia',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1B5E20),
+                            fontFamily: 'Montserrat',
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Silahkan ajukan penarikan',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                            fontFamily: 'Montserrat',
+                          ),
+                        ),
+                      ],
+                    ),
+                    // ✅ LOADING INDICATOR ATAU SALDO
+                    _isLoadingSaldo
+                        ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF4CAF50),
+                            ),
+                          )
+                        : Text(
+                            _saldoText,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2E7D32),
+                              fontFamily: 'Montserrat',
+                            ),
+                          ),
+                  ],
+                ),
+              ),
+
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.only(top: 20),
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
+                  margin: EdgeInsets.only(top: 0),
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.vertical(
                       top: Radius.circular(30),
@@ -303,7 +491,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildLabel('Nama Lengkap'),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8),
                           TextFormField(
                             controller: _namaCtrl,
                             decoration: InputDecoration(
@@ -325,12 +513,12 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
+                                borderSide: BorderSide(
                                   color: Color(0xFF4CAF50),
                                   width: 2,
                                 ),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(
+                              contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 14,
                               ),
@@ -339,9 +527,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                 ? 'Nama lengkap wajib diisi'
                                 : null,
                           ),
-                          const SizedBox(height: 20),
+                          SizedBox(height: 20),
                           _buildLabel('E-Wallet'),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8),
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -359,7 +547,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
-                                contentPadding: const EdgeInsets.symmetric(
+                                contentPadding: EdgeInsets.symmetric(
                                   horizontal: 16,
                                   vertical: 14,
                                 ),
@@ -369,9 +557,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                   value: wallet,
                                   child: Text(
                                     wallet,
-                                    style: const TextStyle(
-                                      fontFamily: 'Montserrat',
-                                    ),
+                                    style: TextStyle(fontFamily: 'Montserrat'),
                                   ),
                                 );
                               }).toList(),
@@ -383,14 +569,14 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                   : null,
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          SizedBox(height: 20),
                           _buildLabel('Nomor E-Wallet'),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8),
                           TextFormField(
                             controller: _nomorEWalletCtrl,
-                            keyboardType: TextInputType.number,
+                            keyboardType: TextInputType.phone,
                             decoration: InputDecoration(
-                              hintText: 'Masukkan nomor e-wallet anda',
+                              hintText: 'Contoh: 081234567890',
                               hintStyle: TextStyle(color: Colors.grey[400]),
                               filled: true,
                               fillColor: Colors.white,
@@ -408,26 +594,21 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
+                                borderSide: BorderSide(
                                   color: Color(0xFF4CAF50),
                                   width: 2,
                                 ),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(
+                              contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 14,
                               ),
                             ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty)
-                                return 'Nomor e-wallet wajib diisi';
-                              if (value.length < 10) return 'Nomor tidak valid';
-                              return null;
-                            },
+                            validator: _validateEWalletNumber,
                           ),
-                          const SizedBox(height: 20),
+                          SizedBox(height: 20),
                           _buildLabel('Nominal Penarikan'),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8),
                           TextFormField(
                             controller: _nominalCtrl,
                             keyboardType: TextInputType.number,
@@ -450,12 +631,12 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
+                                borderSide: BorderSide(
                                   color: Color(0xFF4CAF50),
                                   width: 2,
                                 ),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(
+                              contentPadding: EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 14,
                               ),
@@ -473,14 +654,14 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 32),
+                          SizedBox(height: 32),
                           SizedBox(
                             width: double.infinity,
                             height: 52,
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _submitWithdrawal,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2E7D32),
+                                backgroundColor: Color(0xFF2E7D32),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
@@ -488,7 +669,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                 ),
                               ),
                               child: _isLoading
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       height: 24,
                                       width: 24,
                                       child: CircularProgressIndicator(
@@ -496,7 +677,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                         strokeWidth: 2,
                                       ),
                                     )
-                                  : const Text(
+                                  : Text(
                                       'Kirim',
                                       style: TextStyle(
                                         fontSize: 18,
@@ -506,7 +687,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                     ),
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          SizedBox(height: 20),
                         ],
                       ),
                     ),
@@ -520,11 +701,10 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     );
   }
 
-  // ✅ PINDAHKAN METHOD INI KE LUAR build() METHOD
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: Color(0xFF1B5E20),

@@ -37,6 +37,11 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
     _fetchRiwayatSetor();
   }
 
+  // ✅ HANDLE PULL-TO-REFRESH
+  Future<void> _handleRefresh() async {
+    await _fetchRiwayatSetor();
+  }
+
   Future<void> _fetchRiwayatSetor() async {
     setState(() {
       _isLoading = true;
@@ -112,7 +117,10 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeUserScreen()),
+          ),
         ),
         title: const Text(
           'Riwayat Setor',
@@ -150,8 +158,15 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen> {
             ),
           ),
 
-          // ✅ LIST DATA
-          Expanded(child: _buildContent()),
+          // ✅ LIST DATA dengan PULL-TO-REFRESH
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              color: const Color(0xFF4CAF50),
+              backgroundColor: Colors.white,
+              child: _buildContent(),
+            ),
+          ),
 
           // ✅ BUBBLE TABS (Bank Sampah)
           Container(

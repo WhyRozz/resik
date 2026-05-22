@@ -99,6 +99,68 @@ class _QrBarcodeScreenState extends State<QrBarcodeScreen> {
     );
   }
 
+  void _showInvalidQRDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.qr_code_scanner, color: Colors.orange, size: 28),
+                const SizedBox(width: 8),
+                const Text(
+                  'QR Tidak Valid',
+                  style: TextStyle(color: Color(0xFF1B5E20)),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Kode QR yang discan tidak terdaftar dalam database.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade300),
+                  ),
+                  child: Text(
+                    'Detail: $message',
+                    style: const TextStyle(fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    color: Color(0xFF4CAF50),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleScan(String scannedCode) async {
     setState(() => _isProcessing = true);
 
@@ -132,7 +194,7 @@ class _QrBarcodeScreenState extends State<QrBarcodeScreen> {
             ),
           );
         } else {
-          _showError('Pengguna tidak ditemukan: ${result['message']}');
+          _showInvalidQRDialog(result['message'] ?? 'Pengguna tidak ditemukan');
         }
       } else {
         _showError('Gagal: ${response.statusCode}');
