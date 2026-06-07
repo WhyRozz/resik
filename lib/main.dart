@@ -54,6 +54,7 @@ class MyApp extends StatelessWidget {
             alamat: args['alamat'] ?? '',
             job: args['job'],
             dinasId: args['dinasId'],
+            idDesa: args['idDesa'],
           );
         },
         '/verify-otp': (context) {

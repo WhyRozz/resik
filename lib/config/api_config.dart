@@ -1,6 +1,6 @@
 class ApiConfig {
-  static const String baseUrl = 'https://resik.pbltifnganjuk.com/api';
-  static const String storageUrl = 'https://resik.pbltifnganjuk.com/uploads';
+  static const String baseUrl = 'http://192.168.0.34:8000/api';
+  static const String storageUrl = 'http://192.168.0.34:8000/uploads';
 
   static Map<String, String> get headers => {
     'Content-Type': 'application/json',
@@ -53,15 +53,15 @@ class ApiConfig {
 
   static String imageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
-    
+
     // Kalau sudah full URL, return apa adanya
     if (path.startsWith('http')) return path;
-    
+
     // Hapus prefix lama yang mungkin ada
     String cleanPath = path
         .replaceFirst(RegExp(r'^storage/'), '')
         .replaceFirst(RegExp(r'^uploads/'), '');
-    
+
     return '$storageUrl/$cleanPath';
   }
 }
