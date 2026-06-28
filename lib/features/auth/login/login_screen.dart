@@ -337,7 +337,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           GestureDetector(
                             onTap: () {
-                              Navigator.pushNamed(context, '/register-step1');
+                              Navigator.pushNamed(context, '/register');
                             },
                             child: const Text(
                               'Daftar Disini',

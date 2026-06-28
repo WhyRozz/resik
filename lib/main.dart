@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/auth/welcome_screen.dart';
 import 'features/auth/login/login_screen.dart';
-import 'features/auth/register/register_step1.dart';
-import 'features/auth/register/register_step2.dart';
+import 'features/auth/register/register_screen.dart';
 import 'features/auth/forgot_password/forgot_password_screen.dart';
 import 'features/auth/forgot_password/verify_otp_screen.dart';
 import 'features/auth/forgot_password/reset_password_screen.dart';
@@ -42,20 +41,8 @@ class MyApp extends StatelessWidget {
         '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => const LoginScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
-        '/register-step1': (context) => const RegisterStep1(),
-        '/register-step2': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
-          return RegisterStep2(
-            nama: args['nama'] ?? '',
-            gender: args['gender'],
-            tglLahir: args['tglLahir'],
-            alamat: args['alamat'] ?? '',
-            job: args['job'],
-            dinasId: args['dinasId'],
-          );
-        },
+        '/register': (context) => const RegisterScreen(),
+        
         '/verify-otp': (context) {
           final email = ModalRoute.of(context)!.settings.arguments as String;
           return VerifyOtpScreen(email: email);
@@ -71,8 +58,6 @@ class MyApp extends StatelessWidget {
         },
         '/home-user': (context) => const HomeUserScreen(),
         '/home-admin': (context) => const HomeAdminScreen(),
-        //'/scan': (context) => const ScanPage(),
-        //'/penjemputan': (context) => const PenjemputanPage(),
       },
     );
   }

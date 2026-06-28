@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import '../../../config/api_config.dart';
 
 class RegisterStep2 extends StatefulWidget {
@@ -10,6 +11,7 @@ class RegisterStep2 extends StatefulWidget {
   final String alamat;
   final String? job;
   final String? dinasId;
+  final String? desaId;
 
   const RegisterStep2({
     super.key,
@@ -19,6 +21,7 @@ class RegisterStep2 extends StatefulWidget {
     required this.alamat,
     required this.job,
     required this.dinasId,
+    required this.desaId,
   });
 
   @override
@@ -31,19 +34,17 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
   final TextEditingController _passwordCtrl = TextEditingController();
   final TextEditingController _confirmPasswordCtrl = TextEditingController();
   
-  final GlobalKey _passwordFieldKey = GlobalKey(); // ✅ Key untuk shake animation
+  final GlobalKey _passwordFieldKey = GlobalKey();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   
-  // ✅ Animation controller untuk shake
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
 
   @override
   void initState() {
     super.initState();
-    // ✅ Setup shake animation
     _shakeController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
@@ -52,11 +53,8 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
       CurveTween(curve: Curves.easeInOut),
     ).animate(_shakeController);
     
-    // ✅ LISTENER untuk update real-time saat user mengetik password
     _passwordCtrl.addListener(() {
-      setState(() {
-        // Rebuild UI untuk update password requirements indicator
-      });
+      setState(() {});
     });
   }
 
@@ -70,7 +68,6 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
     super.dispose();
   }
 
-  // ✅ VALIDASI PASSWORD KUAT
   Map<String, bool> _validatePassword(String password) {
     return {
       'minLength': password.length >= 8,
@@ -81,7 +78,6 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
     };
   }
 
-  // ✅ CEK APAKAH PASSWORD SUDAH KUAT
   bool _isPasswordStrong(String password) {
     final validation = _validatePassword(password);
     return validation['minLength']! &&
@@ -91,7 +87,6 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
            validation['hasSymbol']!;
   }
 
-  // ✅ SHAKE ANIMATION
   void _shakePasswordField() {
     _shakeController.forward(from: 0);
   }
@@ -124,8 +119,6 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
   void _handleRegister() async {
     final password = _passwordCtrl.text.trim();
     final confirmPassword = _confirmPasswordCtrl.text.trim();
-    
-    // Validasi password kuat
     final validation = _validatePassword(password);
     
     if (password.isEmpty) {
@@ -133,44 +126,36 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
       _showSnackBar('Password tidak boleh kosong');
       return;
     }
-
     if (!validation['minLength']!) {
       _shakePasswordField();
       _showSnackBar('Password minimal 8 karakter');
       return;
     }
-
     if (!validation['hasUppercase']!) {
       _shakePasswordField();
       _showSnackBar('Password harus mengandung huruf besar');
       return;
     }
-
     if (!validation['hasLowercase']!) {
       _shakePasswordField();
       _showSnackBar('Password harus mengandung huruf kecil');
       return;
     }
-
     if (!validation['hasNumber']!) {
       _shakePasswordField();
       _showSnackBar('Password harus mengandung angka');
       return;
     }
-
     if (!validation['hasSymbol']!) {
       _shakePasswordField();
       _showSnackBar('Password harus mengandung simbol (!@#\$%&*)');
       return;
     }
-
     if (password != confirmPassword) {
       _shakePasswordField();
       _showSnackBar('Konfirmasi password tidak cocok');
       return;
     }
-
-    // Validasi lainnya
     if (_teleponCtrl.text.isEmpty) {
       _showSnackBar('No telepon harus diisi');
       return;
@@ -179,41 +164,48 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
       _showSnackBar('Email tidak valid');
       return;
     }
+    if (widget.desaId == null || widget.desaId!.isEmpty) {
+      _showSnackBar('Desa/Kelurahan wajib dipilih');
+      return;
+    }
 
-    // Show loading
     _showLoading();
 
     try {
-      // Prepare data
+      final String tipeUser = widget.job == 'ASN / PNS' ? 'pns' : 'masyarakat';
+
       final requestData = {
+        'tipe': tipeUser,
         'nama': widget.nama,
         'email': _emailCtrl.text,
         'password': password,
         'no_telepon': _teleponCtrl.text,
         'jenis_kelamin': widget.gender,
-        'tanggal_lahir': widget.tglLahir != null
-            ? '${widget.tglLahir!.year}-${widget.tglLahir!.month.toString().padLeft(2, '0')}-${widget.tglLahir!.day.toString().padLeft(2, '0')}'
+        'tanggal_lahir': widget.tglLahir != null 
+            ? DateFormat('yyyy-MM-dd').format(widget.tglLahir!) 
             : null,
         'alamat': widget.alamat,
-        'pekerjaan': widget.job,
-        'id_dinas': widget.dinasId != null ? int.parse(widget.dinasId!) : null,
+        'id_desa': widget.desaId != null ? int.parse(widget.desaId!) : null,
+        if (tipeUser == 'pns') 
+          'id_dinas': widget.dinasId != null ? int.parse(widget.dinasId!) : null,
       };
 
-      // Hit API
+      debugPrint("📤 Register Request: ${jsonEncode(requestData)}");
+
       final response = await http.post(
         Uri.parse(ApiConfig.register),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestData),
       );
 
+      debugPrint("📥 Register Response: ${response.body}");
+
       final result = jsonDecode(response.body);
 
       if (result['status'] == 'success') {
         final barcodeId = result['data']['barcode_id'];
-
         _hideLoading();
         _showSnackBar('Registrasi berhasil! Barcode: $barcodeId');
-
         Navigator.pushReplacementNamed(context, '/login');
       } else {
         _hideLoading();
@@ -221,6 +213,7 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
       }
     } catch (e) {
       _hideLoading();
+      debugPrint("❌ Register Error: $e");
       _showSnackBar('Terjadi kesalahan: $e');
     }
   }
@@ -242,7 +235,6 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
         child: SafeArea(
           child: Column(
             children: [
-              // Header Logo & Title
               Padding(
                 padding: const EdgeInsets.only(top: 20, bottom: 10),
                 child: Column(
@@ -269,23 +261,18 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
                   ],
                 ),
               ),
-
-              // Area Form (White Container)
               Expanded(
                 child: Container(
                   margin: const EdgeInsets.only(top: 20),
                   padding: const EdgeInsets.all(20),
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(30),
-                    ),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
                   ),
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // 1. No Telepon
                         _buildLabel('No Telepon'),
                         _buildTextField(
                           controller: _teleponCtrl,
@@ -294,7 +281,6 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
                         ),
                         const SizedBox(height: 16),
 
-                        // 2. Email
                         _buildLabel('Email'),
                         _buildTextField(
                           controller: _emailCtrl,
@@ -303,10 +289,7 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
                         ),
                         const SizedBox(height: 16),
 
-                        // 3. Kata Sandi
                         _buildLabel('Kata Sandi'),
-                        
-                        // ✅ SHAKE ANIMATION WRAPPER
                         AnimatedBuilder(
                           animation: _shakeAnimation,
                           builder: (context, child) {
@@ -322,9 +305,7 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
                             obscureText: _obscurePassword,
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
+                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
                                 color: const Color(0xFF2E7D32),
                               ),
                               onPressed: () {
@@ -335,13 +316,9 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
                             ),
                           ),
                         ),
-                        
-                        // ✅ PASSWORD REQUIREMENTS INDICATOR
                         _buildPasswordRequirements(passwordValidation, isStrongPassword),
-                        
                         const SizedBox(height: 16),
 
-                        // 4. Konfirmasi Kata Sandi
                         _buildLabel('Konfirmasi Kata Sandi'),
                         _buildTextField(
                           controller: _confirmPasswordCtrl,
@@ -349,22 +326,18 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
                           obscureText: _obscureConfirmPassword,
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureConfirmPassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
+                              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
                               color: const Color(0xFF2E7D32),
                             ),
                             onPressed: () {
                               setState(() {
-                                _obscureConfirmPassword =
-                                    !_obscureConfirmPassword;
+                                _obscureConfirmPassword = !_obscureConfirmPassword;
                               });
                             },
                           ),
                         ),
                         const SizedBox(height: 30),
 
-                        // Tombol Daftar
                         Center(
                           child: GestureDetector(
                             onTap: (isStrongPassword && _confirmPasswordCtrl.text.isNotEmpty)
@@ -412,8 +385,6 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
     );
   }
 
-  // --- Helper Widgets ---
-
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -448,31 +419,21 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
         controller: controller,
         keyboardType: keyboardType,
         obscureText: obscureText,
-        style: const TextStyle(
-          color: Color(0xFF1B5E20),
-          fontFamily: 'Montserrat',
-        ),
+        style: const TextStyle(color: Color(0xFF1B5E20), fontFamily: 'Montserrat'),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(
-            color: Colors.grey[400],
-            fontFamily: 'Montserrat',
-          ),
+          hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Montserrat'),
           suffixIcon: suffixIcon,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
     );
   }
 
-  // ✅ WIDGET PASSWORD REQUIREMENTS
   Widget _buildPasswordRequirements(Map<String, bool> validation, bool isStrong) {
     return Container(
       margin: const EdgeInsets.only(top: 12),
@@ -490,33 +451,14 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
         children: [
           const Text(
             'Persyaratan Password:',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1B5E20),
-            ),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
           ),
           const SizedBox(height: 8),
-          _buildRequirementItem(
-            'Minimal 8 karakter',
-            validation['minLength']!,
-          ),
-          _buildRequirementItem(
-            'Huruf besar (A-Z)',
-            validation['hasUppercase']!,
-          ),
-          _buildRequirementItem(
-            'Huruf kecil (a-z)',
-            validation['hasLowercase']!,
-          ),
-          _buildRequirementItem(
-            'Angka (0-9)',
-            validation['hasNumber']!,
-          ),
-          _buildRequirementItem(
-            'Simbol (!@#\$%&*)',
-            validation['hasSymbol']!,
-          ),
+          _buildRequirementItem('Minimal 8 karakter', validation['minLength']!),
+          _buildRequirementItem('Huruf besar (A-Z)', validation['hasUppercase']!),
+          _buildRequirementItem('Huruf kecil (a-z)', validation['hasLowercase']!),
+          _buildRequirementItem('Angka (0-9)', validation['hasNumber']!),
+          _buildRequirementItem('Simbol (!@#\$%&*)', validation['hasSymbol']!),
         ],
       ),
     );

@@ -1,6 +1,21 @@
 class ApiConfig {
-  static const String baseUrl = 'https://resik.pbltifnganjuk.com/api';
-  static const String storageUrl = 'https://resik.pbltifnganjuk.com/uploads';
+  // 🔧 KONTROL MODE: false = Local/Maintenance, true = Production
+  static const bool isProduction = false; 
+
+  // 🌐 Base URL dinamis berdasarkan mode
+  static String get _baseUrl {
+    if (isProduction) {
+      return 'https://resik.pbltifnganjuk.com';
+    } else {
+      // 📱 Android Emulator  → 'http://10.0.2.2:8000'
+      // 🍎 iOS Simulator/Web → 'http://localhost:8000'
+      // 📱 HP Fisikal (WiFi) → 'http://192.168.1.xx:8000' (ganti xx dengan IP Laptop)
+      return 'http://192.168.18.2:8000'; 
+    }
+  }
+
+  static String get baseUrl => '$_baseUrl/api';
+  static String get storageUrl => '$_baseUrl/uploads';
 
   static Map<String, String> get headers => {
     'Content-Type': 'application/json',
@@ -24,7 +39,7 @@ class ApiConfig {
   // ==================== 📊 DATA PUBLIK ====================
   static String get dinas => '$baseUrl/dinas';
   static String get artikel => '$baseUrl/artikel';
-  static String get jenisSampah => '$baseUrl/jenis-sampah'; // ✅ TAMBAH INI
+  static String get jenisSampah => '$baseUrl/jenis-sampah';
 
   // ==================== 📝 LAPORAN (SAMPAH ILEGAL) ====================
   static String get laporanStore => '$baseUrl/laporan';
@@ -35,9 +50,8 @@ class ApiConfig {
   static String get penarikanIndex => '$baseUrl/penarikan';
 
   // ==================== 🔄 TRANSAKSI SETOR (PETUGAS) ====================
-  static String get cariPengguna => '$baseUrl/cari-pengguna'; // ✅ TAMBAH INI
-  static String get transaksiSetorStore =>
-      '$baseUrl/transaksi-setor'; // ✅ TAMBAH INI
+  static String get cariPengguna => '$baseUrl/cari-pengguna';
+  static String get transaksiSetorStore => '$baseUrl/transaksi-setor';
 
   // ==================== 🗂️ JENIS SAMPAH ====================
   static String get jenisSampahList => '$baseUrl/jenis-sampah';
@@ -51,17 +65,11 @@ class ApiConfig {
   // ==================== 📍 INFO TPS ====================
   static String get infoTps => '$baseUrl/tps';
 
+  // ✅ HELPER GAMBAR (Otomatis ikut base URL local/prod)
   static String imageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
-    
-    // Kalau sudah full URL, return apa adanya
     if (path.startsWith('http')) return path;
-    
-    // Hapus prefix lama yang mungkin ada
-    String cleanPath = path
-        .replaceFirst(RegExp(r'^storage/'), '')
-        .replaceFirst(RegExp(r'^uploads/'), '');
-    
+    String cleanPath = path.replaceFirst(RegExp(r'^storage/|^uploads/'), '');
     return '$storageUrl/$cleanPath';
   }
 }

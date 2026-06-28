@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../services/dinas_service.dart';
+import '../../../services/desa_service.dart';
 
 class RegisterStep1 extends StatefulWidget {
   const RegisterStep1({super.key});
@@ -9,7 +11,7 @@ class RegisterStep1 extends StatefulWidget {
 }
 
 class _RegisterStep1State extends State<RegisterStep1> {
-  final _formKey = GlobalKey<FormState>(); // ✅ Tambah form key untuk validasi
+  final _formKey = GlobalKey<FormState>();
   
   // Controllers
   final TextEditingController _namaCtrl = TextEditingController();
@@ -21,10 +23,13 @@ class _RegisterStep1State extends State<RegisterStep1> {
   String? _selectedGender;
   String? _selectedJob;
   String? _selectedDinasId;
+  String? _selectedDesaId;
 
   // Data State
   List<Map<String, dynamic>> _dinasData = [];
+  List<Map<String, dynamic>> _desaData = [];
   bool _isLoadingDinas = false;
+  bool _isLoadingDesa = false;
 
   final List<String> _genders = ['Laki-laki', 'Perempuan'];
   final List<String> _jobs = ['Masyarakat Umum', 'ASN / PNS'];
@@ -35,6 +40,7 @@ class _RegisterStep1State extends State<RegisterStep1> {
   void initState() {
     super.initState();
     _loadDinasData();
+    _loadDesaData();
   }
 
   Future<void> _loadDinasData() async {
@@ -43,6 +49,15 @@ class _RegisterStep1State extends State<RegisterStep1> {
     setState(() {
       _dinasData = data;
       _isLoadingDinas = false;
+    });
+  }
+
+  Future<void> _loadDesaData() async {
+    setState(() => _isLoadingDesa = true);
+    final data = await DesaService().getAllDesa();
+    setState(() {
+      _desaData = data;
+      _isLoadingDesa = false;
     });
   }
 
@@ -68,12 +83,11 @@ class _RegisterStep1State extends State<RegisterStep1> {
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
-        _tglLahirCtrl.text = "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
+        _tglLahirCtrl.text = DateFormat('dd/MM/yyyy').format(picked);
       });
     }
   }
 
-  // ✅ Fungsi Validasi
   bool _validateAndSave() {
     if (_namaCtrl.text.isEmpty) {
       _showSnackBar('Nama lengkap wajib diisi');
@@ -96,7 +110,11 @@ class _RegisterStep1State extends State<RegisterStep1> {
       return false;
     }
     if (_showDinas && _selectedDinasId == null) {
-      _showSnackBar('Dinas wajib dipilih');
+      _showSnackBar('Dinas wajib dipilih untuk ASN/PNS');
+      return false;
+    }
+    if (_selectedDesaId == null) {
+      _showSnackBar('Desa/Kelurahan wajib dipilih');
       return false;
     }
     return true;
@@ -127,7 +145,6 @@ class _RegisterStep1State extends State<RegisterStep1> {
         child: SafeArea(
           child: Column(
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.only(top: 20, bottom: 10),
                 child: Column(
@@ -154,8 +171,6 @@ class _RegisterStep1State extends State<RegisterStep1> {
                   ],
                 ),
               ),
-
-              // Form Area
               Expanded(
                 child: Container(
                   margin: const EdgeInsets.only(top: 20),
@@ -214,7 +229,6 @@ class _RegisterStep1State extends State<RegisterStep1> {
                           ),
                           const SizedBox(height: 16),
 
-                          // Dropdown Dinas (Conditional + Fetch DB)
                           if (_showDinas) ...[
                             _buildLabel('Dinas'),
                             _isLoadingDinas
@@ -225,7 +239,14 @@ class _RegisterStep1State extends State<RegisterStep1> {
                             const SizedBox(height: 16),
                           ],
 
-                          // Tombol Next
+                          _buildLabel('Desa/Kelurahan'),
+                          _isLoadingDesa
+                              ? const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)))
+                              : _desaData.isEmpty
+                                  ? const Center(child: Text('Data desa kosong', style: TextStyle(color: Colors.red)))
+                                  : _buildDropdownDesa(),
+                          const SizedBox(height: 16),
+
                           Center(
                             child: GestureDetector(
                               onTap: () {
@@ -237,6 +258,7 @@ class _RegisterStep1State extends State<RegisterStep1> {
                                     'alamat': _alamatCtrl.text,
                                     'job': _selectedJob,
                                     'dinasId': _selectedDinasId,
+                                    'desaId': _selectedDesaId,
                                   });
                                 }
                               },
@@ -272,8 +294,6 @@ class _RegisterStep1State extends State<RegisterStep1> {
     );
   }
 
-  // --- Helper Widgets ---
-  
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -360,9 +380,9 @@ class _RegisterStep1State extends State<RegisterStep1> {
       ),
       child: DropdownButtonFormField<String>(
         value: _selectedDinasId,
-        isDense: true, // ✅ Penting: biar tidak overflow
-        isExpanded: true, // ✅ Penting: text wrap otomatis
-        menuMaxHeight: 300, // ✅ Separuh layar (max 300px)
+        isDense: true,
+        isExpanded: true,
+        menuMaxHeight: 300,
         decoration: InputDecoration(
           hintText: 'Pilih Dinas',
           hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Montserrat'),
@@ -379,16 +399,55 @@ class _RegisterStep1State extends State<RegisterStep1> {
             child: Text(
               item['nama_dinas'],
               style: const TextStyle(fontFamily: 'Montserrat'),
-              maxLines: 2, // ✅ Text bisa 2 baris
-              overflow: TextOverflow.ellipsis, // ✅ Kalau kepanjangan, pakai ...
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           );
         }).toList(),
         onChanged: (val) => setState(() => _selectedDinasId = val),
         validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Dinas wajib dipilih';
-          }
+          if (value == null || value.isEmpty) return 'Dinas wajib dipilih';
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildDropdownDesa() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8E9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _selectedDesaId,
+        isDense: true,
+        isExpanded: true,
+        menuMaxHeight: 300,
+        decoration: InputDecoration(
+          hintText: 'Pilih Desa/Kelurahan',
+          hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Montserrat'),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF2E7D32)),
+        items: _desaData.map((item) {
+          return DropdownMenuItem(
+            value: item['id_desa'].toString(),
+            child: Text(
+              '${item['nama_desa']} (${item['jenis']})',
+              style: const TextStyle(fontFamily: 'Montserrat'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          );
+        }).toList(),
+        onChanged: (val) => setState(() => _selectedDesaId = val),
+        validator: (value) {
+          if (value == null || value.isEmpty) return 'Desa/Kelurahan wajib dipilih';
           return null;
         },
       ),
