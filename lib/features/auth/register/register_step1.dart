@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../services/dinas_service.dart';
+<<<<<<< HEAD
 import '../../../services/desa_service.dart';
+=======
+import '../../../services/wilayah_service.dart';
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
 
 class RegisterStep1 extends StatefulWidget {
   const RegisterStep1({super.key});
@@ -12,7 +16,11 @@ class RegisterStep1 extends StatefulWidget {
 
 class _RegisterStep1State extends State<RegisterStep1> {
   final _formKey = GlobalKey<FormState>();
+<<<<<<< HEAD
   
+=======
+
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   // Controllers
   final TextEditingController _namaCtrl = TextEditingController();
   final TextEditingController _alamatCtrl = TextEditingController();
@@ -25,6 +33,14 @@ class _RegisterStep1State extends State<RegisterStep1> {
   String? _selectedDinasId;
   String? _selectedDesaId;
 
+  // ✅ State Kecamatan & Desa
+  String? _selectedKecamatanId;
+  String? _selectedDesaId;
+  List<Map<String, dynamic>> _kecamatanData = [];
+  List<Map<String, dynamic>> _desaData = [];
+  bool _isLoadingKecamatan = false;
+  bool _isLoadingDesa = false;
+
   // Data State
   List<Map<String, dynamic>> _dinasData = [];
   List<Map<String, dynamic>> _desaData = [];
@@ -35,12 +51,17 @@ class _RegisterStep1State extends State<RegisterStep1> {
   final List<String> _jobs = ['Masyarakat Umum', 'ASN / PNS'];
 
   bool get _showDinas => _selectedJob == 'ASN / PNS';
+  bool get _showWilayah => _selectedJob == 'Masyarakat Umum';
 
   @override
   void initState() {
     super.initState();
     _loadDinasData();
+<<<<<<< HEAD
     _loadDesaData();
+=======
+    _loadKecamatanData();
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   }
 
   Future<void> _loadDinasData() async {
@@ -52,9 +73,28 @@ class _RegisterStep1State extends State<RegisterStep1> {
     });
   }
 
+<<<<<<< HEAD
   Future<void> _loadDesaData() async {
     setState(() => _isLoadingDesa = true);
     final data = await DesaService().getAllDesa();
+=======
+  Future<void> _loadKecamatanData() async {
+    setState(() => _isLoadingKecamatan = true);
+    final data = await WilayahService.getKecamatans();
+    setState(() {
+      _kecamatanData = data;
+      _isLoadingKecamatan = false;
+    });
+  }
+
+  Future<void> _loadDesaData(String kecamatanId) async {
+    setState(() {
+      _isLoadingDesa = true;
+      _desaData = [];
+      _selectedDesaId = null;
+    });
+    final data = await WilayahService.getDesas(int.parse(kecamatanId));
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
     setState(() {
       _desaData = data;
       _isLoadingDesa = false;
@@ -83,11 +123,20 @@ class _RegisterStep1State extends State<RegisterStep1> {
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
+<<<<<<< HEAD
         _tglLahirCtrl.text = DateFormat('dd/MM/yyyy').format(picked);
+=======
+        _tglLahirCtrl.text =
+            "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
       });
     }
   }
 
+<<<<<<< HEAD
+=======
+  // ✅ VALIDASI UPDATED - SESUAI URUTAN BARU
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   bool _validateAndSave() {
     if (_namaCtrl.text.isEmpty) {
       _showSnackBar('Nama lengkap wajib diisi');
@@ -101,14 +150,23 @@ class _RegisterStep1State extends State<RegisterStep1> {
       _showSnackBar('Tanggal lahir wajib dipilih');
       return false;
     }
-    if (_alamatCtrl.text.isEmpty) {
-      _showSnackBar('Alamat wajib diisi');
-      return false;
-    }
     if (_selectedJob == null) {
       _showSnackBar('Pekerjaan wajib dipilih');
       return false;
     }
+
+    // Validasi berdasarkan pekerjaan
+    if (_showWilayah) {
+      if (_selectedKecamatanId == null) {
+        _showSnackBar('Kecamatan wajib dipilih');
+        return false;
+      }
+      if (_selectedDesaId == null) {
+        _showSnackBar('Desa/Kelurahan wajib dipilih');
+        return false;
+      }
+    }
+
     if (_showDinas && _selectedDinasId == null) {
       _showSnackBar('Dinas wajib dipilih untuk ASN/PNS');
       return false;
@@ -117,6 +175,12 @@ class _RegisterStep1State extends State<RegisterStep1> {
       _showSnackBar('Desa/Kelurahan wajib dipilih');
       return false;
     }
+
+    if (_alamatCtrl.text.isEmpty) {
+      _showSnackBar('Alamat wajib diisi');
+      return false;
+    }
+
     return true;
   }
 
@@ -177,7 +241,9 @@ class _RegisterStep1State extends State<RegisterStep1> {
                   padding: const EdgeInsets.all(20),
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(30),
+                    ),
                   ),
                   child: SingleChildScrollView(
                     child: Form(
@@ -185,19 +251,26 @@ class _RegisterStep1State extends State<RegisterStep1> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // 1. NAMA LENGKAP
                           _buildLabel('Nama Lengkap'),
-                          _buildTextField(controller: _namaCtrl, hint: 'Nama Lengkap'),
+                          _buildTextField(
+                            controller: _namaCtrl,
+                            hint: 'Nama Lengkap',
+                          ),
                           const SizedBox(height: 16),
 
+                          // 2. JENIS KELAMIN
                           _buildLabel('Jenis Kelamin'),
                           _buildDropdown(
                             items: _genders,
                             value: _selectedGender,
                             hint: 'Jenis Kelamin',
-                            onChanged: (val) => setState(() => _selectedGender = val),
+                            onChanged: (val) =>
+                                setState(() => _selectedGender = val),
                           ),
                           const SizedBox(height: 16),
 
+                          // 3. TANGGAL LAHIR
                           _buildLabel('Tanggal Lahir'),
                           GestureDetector(
                             onTap: () => _selectDate(context),
@@ -205,16 +278,17 @@ class _RegisterStep1State extends State<RegisterStep1> {
                               child: _buildTextField(
                                 controller: _tglLahirCtrl,
                                 hint: 'Tanggal Lahir',
-                                suffixIcon: const Icon(Icons.calendar_today, color: Color(0xFF2E7D32), size: 20),
+                                suffixIcon: const Icon(
+                                  Icons.calendar_today,
+                                  color: Color(0xFF2E7D32),
+                                  size: 20,
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(height: 16),
 
-                          _buildLabel('Alamat'),
-                          _buildTextField(controller: _alamatCtrl, hint: 'Alamat', maxLines: 2),
-                          const SizedBox(height: 16),
-
+                          // 4. PEKERJAAN ← DIPINDAH KE ATAS
                           _buildLabel('Pekerjaan'),
                           _buildDropdown(
                             items: _jobs,
@@ -223,22 +297,99 @@ class _RegisterStep1State extends State<RegisterStep1> {
                             onChanged: (val) {
                               setState(() {
                                 _selectedJob = val;
-                                if (!_showDinas) _selectedDinasId = null;
+                                // Reset semua data yang tidak relevan
+                                _selectedDinasId = null;
+                                _selectedKecamatanId = null;
+                                _selectedDesaId = null;
+                                _desaData = [];
                               });
                             },
                           ),
                           const SizedBox(height: 16),
 
-                          if (_showDinas) ...[
-                            _buildLabel('Dinas'),
-                            _isLoadingDinas
-                                ? const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)))
-                                : _dinasData.isEmpty
-                                    ? const Center(child: Text('Data dinas kosong', style: TextStyle(color: Colors.red)))
-                                    : _buildDropdownDinas(),
+<<<<<<< HEAD
+=======
+                          // 5. KECAMATAN & DESA ← HANYA MUNCUL JIKA MASYARAKAT UMUM
+                          if (_showWilayah) ...[
+                            _buildLabel('Kecamatan'),
+                            _isLoadingKecamatan
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  )
+                                : _buildDropdownDynamic(
+                                    items: _kecamatanData,
+                                    value: _selectedKecamatanId,
+                                    hint: 'Pilih Kecamatan',
+                                    valueKey: 'id_kecamatan',
+                                    labelKey: 'nama_kecamatan',
+                                    onChanged: (val) {
+                                      setState(
+                                        () => _selectedKecamatanId = val,
+                                      );
+                                      if (val != null) {
+                                        _loadDesaData(val);
+                                      } else {
+                                        setState(() {
+                                          _desaData = [];
+                                          _selectedDesaId = null;
+                                        });
+                                      }
+                                    },
+                                  ),
+                            const SizedBox(height: 16),
+
+                            _buildLabel('Desa/Kelurahan'),
+                            _selectedKecamatanId == null
+                                ? _buildDropdownDisabled('Pilih kecamatan dulu')
+                                : _isLoadingDesa
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  )
+                                : _desaData.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'Data desa kosong',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  )
+                                : _buildDropdownDynamic(
+                                    items: _desaData,
+                                    value: _selectedDesaId,
+                                    hint: 'Pilih Desa/Kelurahan',
+                                    valueKey: 'id_desa',
+                                    labelKey: 'nama_desa',
+                                    onChanged: (val) =>
+                                        setState(() => _selectedDesaId = val),
+                                  ),
                             const SizedBox(height: 16),
                           ],
 
+                          // 6. DINAS ← HANYA MUNCUL JIKA ASN/PNS
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
+                          if (_showDinas) ...[
+                            _buildLabel('Dinas'),
+                            _isLoadingDinas
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  )
+                                : _dinasData.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'Data dinas kosong',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  )
+                                : _buildDropdownDinas(),
+                            const SizedBox(height: 16),
+                          ],
+
+<<<<<<< HEAD
                           _buildLabel('Desa/Kelurahan'),
                           _isLoadingDesa
                               ? const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)))
@@ -247,10 +398,23 @@ class _RegisterStep1State extends State<RegisterStep1> {
                                   : _buildDropdownDesa(),
                           const SizedBox(height: 16),
 
+=======
+                          // 7. ALAMAT ← DIPINDAH KE BAWAH
+                          _buildLabel('Alamat'),
+                          _buildTextField(
+                            controller: _alamatCtrl,
+                            hint: 'Nama Jalan, RT/RW, No Rumah',
+                            maxLines: 2,
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Tombol Next
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
                           Center(
                             child: GestureDetector(
                               onTap: () {
                                 if (_validateAndSave()) {
+<<<<<<< HEAD
                                   Navigator.pushNamed(context, '/register-step2', arguments: {
                                     'nama': _namaCtrl.text,
                                     'gender': _selectedGender,
@@ -260,6 +424,21 @@ class _RegisterStep1State extends State<RegisterStep1> {
                                     'dinasId': _selectedDinasId,
                                     'desaId': _selectedDesaId,
                                   });
+=======
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/register-step2',
+                                    arguments: {
+                                      'nama': _namaCtrl.text,
+                                      'gender': _selectedGender,
+                                      'tglLahir': _selectedDate,
+                                      'alamat': _alamatCtrl.text,
+                                      'idDesa': _selectedDesaId,
+                                      'job': _selectedJob,
+                                      'dinasId': _selectedDinasId,
+                                    },
+                                  );
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
                                 }
                               },
                               child: Container(
@@ -276,7 +455,11 @@ class _RegisterStep1State extends State<RegisterStep1> {
                                     ),
                                   ],
                                 ),
-                                child: const Icon(Icons.arrow_forward, color: Colors.white, size: 28),
+                                child: const Icon(
+                                  Icons.arrow_forward,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
                               ),
                             ),
                           ),
@@ -294,6 +477,11 @@ class _RegisterStep1State extends State<RegisterStep1> {
     );
   }
 
+<<<<<<< HEAD
+=======
+  // --- Helper Widgets ---
+
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -323,16 +511,25 @@ class _RegisterStep1State extends State<RegisterStep1> {
       child: TextField(
         controller: controller,
         maxLines: maxLines,
-        style: const TextStyle(color: Color(0xFF1B5E20), fontFamily: 'Montserrat'),
+        style: const TextStyle(
+          color: Color(0xFF1B5E20),
+          fontFamily: 'Montserrat',
+        ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Montserrat'),
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontFamily: 'Montserrat',
+          ),
           suffixIcon: suffixIcon,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
       ),
     );
@@ -353,7 +550,10 @@ class _RegisterStep1State extends State<RegisterStep1> {
         value: value,
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Montserrat'),
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontFamily: 'Montserrat',
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -372,6 +572,86 @@ class _RegisterStep1State extends State<RegisterStep1> {
     );
   }
 
+  Widget _buildDropdownDynamic({
+    required List<Map<String, dynamic>> items,
+    required String? value,
+    required String hint,
+    required String valueKey,
+    required String labelKey,
+    required Function(String?) onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8E9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButtonFormField<String>(
+        value: value,
+        isDense: true,
+        isExpanded: true,
+        menuMaxHeight: 300,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontFamily: 'Montserrat',
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+        ),
+        icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF2E7D32)),
+        items: items.map((item) {
+          return DropdownMenuItem(
+            value: item[valueKey].toString(),
+            child: Text(
+              item[labelKey],
+              style: const TextStyle(fontFamily: 'Montserrat'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          );
+        }).toList(),
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _buildDropdownDisabled(String hint) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButtonFormField<String>(
+        value: null,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontFamily: 'Montserrat',
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+        ),
+        icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+        items: const [],
+        onChanged: null,
+      ),
+    );
+  }
+
   Widget _buildDropdownDinas() {
     return Container(
       decoration: BoxDecoration(
@@ -385,12 +665,18 @@ class _RegisterStep1State extends State<RegisterStep1> {
         menuMaxHeight: 300,
         decoration: InputDecoration(
           hintText: 'Pilih Dinas',
-          hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Montserrat'),
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontFamily: 'Montserrat',
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
         ),
         icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF2E7D32)),
         items: _dinasData.map((item) {

@@ -1,4 +1,5 @@
 class ApiConfig {
+<<<<<<< HEAD
   // 🔧 KONTROL MODE: false = Local/Maintenance, true = Production
   static const bool isProduction = false; 
 
@@ -16,6 +17,10 @@ class ApiConfig {
 
   static String get baseUrl => '$_baseUrl/api';
   static String get storageUrl => '$_baseUrl/uploads';
+=======
+  static const String baseUrl = 'http://192.168.0.34:8000/api';
+  static const String storageUrl = 'http://192.168.0.34:8000/uploads';
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
 
   static Map<String, String> get headers => {
     'Content-Type': 'application/json',
@@ -68,8 +73,20 @@ class ApiConfig {
   // ✅ HELPER GAMBAR (Otomatis ikut base URL local/prod)
   static String imageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
+<<<<<<< HEAD
     if (path.startsWith('http')) return path;
     String cleanPath = path.replaceFirst(RegExp(r'^storage/|^uploads/'), '');
+=======
+
+    // Kalau sudah full URL, return apa adanya
+    if (path.startsWith('http')) return path;
+
+    // Hapus prefix lama yang mungkin ada
+    String cleanPath = path
+        .replaceFirst(RegExp(r'^storage/'), '')
+        .replaceFirst(RegExp(r'^uploads/'), '');
+
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
     return '$storageUrl/$cleanPath';
   }
 }

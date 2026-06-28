@@ -11,7 +11,11 @@ class RegisterStep2 extends StatefulWidget {
   final String alamat;
   final String? job;
   final String? dinasId;
+<<<<<<< HEAD
   final String? desaId;
+=======
+  final String? idDesa;
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
 
   const RegisterStep2({
     super.key,
@@ -21,24 +25,40 @@ class RegisterStep2 extends StatefulWidget {
     required this.alamat,
     required this.job,
     required this.dinasId,
+<<<<<<< HEAD
     required this.desaId,
+=======
+    required this.idDesa,
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   });
 
   @override
   State<RegisterStep2> createState() => _RegisterStep2State();
 }
 
-class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProviderStateMixin {
+class _RegisterStep2State extends State<RegisterStep2>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _teleponCtrl = TextEditingController();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
   final TextEditingController _confirmPasswordCtrl = TextEditingController();
+<<<<<<< HEAD
   
   final GlobalKey _passwordFieldKey = GlobalKey();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   
+=======
+
+  final GlobalKey _passwordFieldKey =
+      GlobalKey(); // ✅ Key untuk shake animation
+
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  // ✅ Animation controller untuk shake
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
 
@@ -49,10 +69,19 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
+<<<<<<< HEAD
     _shakeAnimation = Tween<double>(begin: -10, end: 10).chain(
       CurveTween(curve: Curves.easeInOut),
     ).animate(_shakeController);
     
+=======
+    _shakeAnimation = Tween<double>(
+      begin: -10,
+      end: 10,
+    ).chain(CurveTween(curve: Curves.easeInOut)).animate(_shakeController);
+
+    // ✅ LISTENER untuk update real-time saat user mengetik password
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
     _passwordCtrl.addListener(() {
       setState(() {});
     });
@@ -81,10 +110,10 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
   bool _isPasswordStrong(String password) {
     final validation = _validatePassword(password);
     return validation['minLength']! &&
-           validation['hasUppercase']! &&
-           validation['hasLowercase']! &&
-           validation['hasNumber']! &&
-           validation['hasSymbol']!;
+        validation['hasUppercase']! &&
+        validation['hasLowercase']! &&
+        validation['hasNumber']! &&
+        validation['hasSymbol']!;
   }
 
   void _shakePasswordField() {
@@ -119,8 +148,13 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
   void _handleRegister() async {
     final password = _passwordCtrl.text.trim();
     final confirmPassword = _confirmPasswordCtrl.text.trim();
+<<<<<<< HEAD
+=======
+
+    // Validasi password kuat
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
     final validation = _validatePassword(password);
-    
+
     if (password.isEmpty) {
       _shakePasswordField();
       _showSnackBar('Password tidak boleh kosong');
@@ -185,9 +219,15 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
             ? DateFormat('yyyy-MM-dd').format(widget.tglLahir!) 
             : null,
         'alamat': widget.alamat,
+<<<<<<< HEAD
         'id_desa': widget.desaId != null ? int.parse(widget.desaId!) : null,
         if (tipeUser == 'pns') 
           'id_dinas': widget.dinasId != null ? int.parse(widget.dinasId!) : null,
+=======
+        'pekerjaan': widget.job,
+        'id_dinas': widget.dinasId != null ? int.parse(widget.dinasId!) : null,
+        'id_desa': widget.idDesa != null ? int.parse(widget.idDesa!) : null,
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
       };
 
       debugPrint("📤 Register Request: ${jsonEncode(requestData)}");
@@ -290,6 +330,11 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
                         const SizedBox(height: 16),
 
                         _buildLabel('Kata Sandi'),
+<<<<<<< HEAD
+=======
+
+                        // ✅ SHAKE ANIMATION WRAPPER
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
                         AnimatedBuilder(
                           animation: _shakeAnimation,
                           builder: (context, child) {
@@ -316,7 +361,17 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
                             ),
                           ),
                         ),
+<<<<<<< HEAD
                         _buildPasswordRequirements(passwordValidation, isStrongPassword),
+=======
+
+                        // ✅ PASSWORD REQUIREMENTS INDICATOR
+                        _buildPasswordRequirements(
+                          passwordValidation,
+                          isStrongPassword,
+                        ),
+
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
                         const SizedBox(height: 16),
 
                         _buildLabel('Konfirmasi Kata Sandi'),
@@ -340,13 +395,17 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
 
                         Center(
                           child: GestureDetector(
-                            onTap: (isStrongPassword && _confirmPasswordCtrl.text.isNotEmpty)
+                            onTap:
+                                (isStrongPassword &&
+                                    _confirmPasswordCtrl.text.isNotEmpty)
                                 ? _handleRegister
                                 : null,
                             child: Container(
                               height: 52,
                               decoration: BoxDecoration(
-                                color: (isStrongPassword && _confirmPasswordCtrl.text.isNotEmpty)
+                                color:
+                                    (isStrongPassword &&
+                                        _confirmPasswordCtrl.text.isNotEmpty)
                                     ? const Color(0xFF2E7D32)
                                     : Colors.grey[400],
                                 borderRadius: BorderRadius.circular(12),
@@ -434,7 +493,15 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
     );
   }
 
+<<<<<<< HEAD
   Widget _buildPasswordRequirements(Map<String, bool> validation, bool isStrong) {
+=======
+  // ✅ WIDGET PASSWORD REQUIREMENTS
+  Widget _buildPasswordRequirements(
+    Map<String, bool> validation,
+    bool isStrong,
+  ) {
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),
@@ -455,8 +522,19 @@ class _RegisterStep2State extends State<RegisterStep2> with SingleTickerProvider
           ),
           const SizedBox(height: 8),
           _buildRequirementItem('Minimal 8 karakter', validation['minLength']!),
+<<<<<<< HEAD
           _buildRequirementItem('Huruf besar (A-Z)', validation['hasUppercase']!),
           _buildRequirementItem('Huruf kecil (a-z)', validation['hasLowercase']!),
+=======
+          _buildRequirementItem(
+            'Huruf besar (A-Z)',
+            validation['hasUppercase']!,
+          ),
+          _buildRequirementItem(
+            'Huruf kecil (a-z)',
+            validation['hasLowercase']!,
+          ),
+>>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
           _buildRequirementItem('Angka (0-9)', validation['hasNumber']!),
           _buildRequirementItem('Simbol (!@#\$%&*)', validation['hasSymbol']!),
         ],
