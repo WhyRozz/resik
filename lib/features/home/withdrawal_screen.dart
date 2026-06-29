@@ -15,10 +15,12 @@ class WithdrawalScreen extends StatefulWidget {
 class _WithdrawalScreenState extends State<WithdrawalScreen> {
   final _formKey = GlobalKey<FormState>();
   final _namaCtrl = TextEditingController();
-  final _nomorEWalletCtrl = TextEditingController();
+  final _nomorRekeningCtrl = TextEditingController();
   final _nominalCtrl = TextEditingController();
 
-  String? _selectedEWallet;
+  String? _selectedJenisLayanan;
+  String? _selectedProvider;
+
   bool _isLoading = false; // ✅ TAMBAH INI (untuk loading button)
   bool _isLoadingSaldo = true; // ✅ Sudah ada
   Map<String, dynamic>? _userData;
@@ -27,7 +29,14 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
   double _saldo = 0.0;
   String _saldoText = "Rp 0"; // ✅ Sudah ada (untuk display)
 
+  final List<String> _jenisLayananOptions = ['E-Wallet', 'Bank Transfer'];
   final List<String> _eWalletOptions = ['Dana', 'OVO', 'GoPay', 'ShopeePay'];
+  final List<String> _bankOptions = [
+    'Bank BCA',
+    'Bank BRI',
+    'Bank Mandiri',
+    'Bank Jatim',
+  ];
 
   @override
   void initState() {
@@ -38,7 +47,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
   @override
   void dispose() {
     _namaCtrl.dispose();
-    _nomorEWalletCtrl.dispose();
+    _nomorRekeningCtrl.dispose();
     _nominalCtrl.dispose();
     super.dispose();
   }
@@ -116,16 +125,26 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     }
   }
 
-  // ✅ VALIDATOR: Nomor E-Wallet Indonesia
+  // ✅ Method 1: Validator E-Wallet (TERPISAH)
   String? _validateEWalletNumber(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Nomor e-wallet tidak boleh kosong';
     }
-
-    // Format Indonesia: 08xxx, 10-13 digit
     final phoneRegex = RegExp(r'^08[0-9]{8,11}$');
     if (!phoneRegex.hasMatch(value.trim())) {
       return 'Format nomor tidak valid (contoh: 081234567890)';
+    }
+    return null;
+  }
+
+  // ✅ Method 2: Validator Bank (TERPISAH, sejajar dengan method 1)
+  String? _validateNomorRekening(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Nomor rekening tidak boleh kosong';
+    }
+    final rekeningRegex = RegExp(r'^[0-9]{8,16}$');
+    if (!rekeningRegex.hasMatch(value.trim())) {
+      return 'Format nomor rekening tidak valid (8-16 digit)';
     }
     return null;
   }
@@ -202,7 +221,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
 
       debugPrint("📤 Request URL: ${ApiConfig.penarikanStore}");
       debugPrint(
-        "📤 Request Body: ${jsonEncode({'id_masyarakat': tipeUser == 'masyarakat' ? userId : null, 'id_pns': tipeUser == 'pns' ? userId : null, 'tipe_user': tipeUser, 'nama': _namaCtrl.text, 'jenis_ewallet': _selectedEWallet, 'nomor_ewallet': _nomorEWalletCtrl.text, 'jumlah_uang': jumlahUang})}",
+        "📤 Request Body: ${jsonEncode({'id_masyarakat': tipeUser == 'masyarakat' ? userId : null, 'id_pns': tipeUser == 'pns' ? userId : null, 'tipe_user': tipeUser, 'nama': _namaCtrl.text, 'jenis_layanan': _selectedJenisLayanan, 'jenis_ewallet': _selectedJenisLayanan == 'bank' ? null : _selectedProvider, 'nama_bank': _selectedJenisLayanan == 'bank' ? _selectedProvider : null, 'nomor_ewallet': _nomorRekeningCtrl.text, 'jumlah_uang': jumlahUang})}",
       );
 
       final response = await http
@@ -214,8 +233,14 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
               'id_pns': tipeUser == 'pns' ? userId : null,
               'tipe_user': tipeUser,
               'nama': _namaCtrl.text,
-              'jenis_ewallet': _selectedEWallet,
-              'nomor_ewallet': _nomorEWalletCtrl.text,
+              'jenis_layanan': _selectedJenisLayanan ?? 'e-wallet',
+              'jenis_ewallet': _selectedJenisLayanan == 'bank'
+                  ? null
+                  : _selectedProvider,
+              'nama_bank': _selectedJenisLayanan == 'bank'
+                  ? _selectedProvider
+                  : null,
+              'nomor_ewallet': _nomorRekeningCtrl.text,
               'jumlah_uang': jumlahUang,
             }),
           )
@@ -238,8 +263,14 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                 'id_penarikan': result['data']?['id'],
                 'id': result['data']?['id'],
                 'nama': _namaCtrl.text,
-                'jenis_ewallet': _selectedEWallet,
-                'nomor_ewallet': _nomorEWalletCtrl.text,
+                'jenis_layanan': _selectedJenisLayanan,
+                'jenis_ewallet': _selectedJenisLayanan == 'bank'
+                    ? null
+                    : _selectedProvider,
+                'nama_bank': _selectedJenisLayanan == 'bank'
+                    ? _selectedProvider
+                    : null,
+                'nomor_ewallet': _nomorRekeningCtrl.text,
                 'jumlah_uang': jumlahUang,
                 'status': result['data']?['status'] ?? 'Diproses',
                 'tanggal_penarikan': DateFormat(
@@ -529,7 +560,8 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                 : null,
                           ),
                           SizedBox(height: 20),
-                          _buildLabel('E-Wallet'),
+                          // Dropdown 1: Pilih Jenis Layanan
+                          _buildLabel('Jenis Layanan'),
                           SizedBox(height: 8),
                           Container(
                             decoration: BoxDecoration(
@@ -538,9 +570,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                               border: Border.all(color: Colors.grey.shade300),
                             ),
                             child: DropdownButtonFormField<String>(
-                              value: _selectedEWallet,
+                              value: _selectedJenisLayanan,
                               decoration: InputDecoration(
-                                hintText: 'Pilih E-Wallet',
+                                hintText: 'Pilih Jenis Layanan',
                                 hintStyle: TextStyle(color: Colors.grey[400]),
                                 filled: true,
                                 fillColor: Colors.white,
@@ -553,31 +585,100 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                   vertical: 14,
                                 ),
                               ),
-                              items: _eWalletOptions.map((String wallet) {
+                              items: _jenisLayananOptions.map((String jenis) {
                                 return DropdownMenuItem<String>(
-                                  value: wallet,
-                                  child: Text(
-                                    wallet,
-                                    style: TextStyle(fontFamily: 'Montserrat'),
-                                  ),
+                                  value: jenis.toLowerCase().contains('bank')
+                                      ? 'bank'
+                                      : 'e-wallet',
+                                  child: Text(jenis),
                                 );
                               }).toList(),
-                              onChanged: (String? newValue) =>
-                                  setState(() => _selectedEWallet = newValue),
+                              onChanged: (String? newValue) {
+                                setState(() {
+                                  _selectedJenisLayanan = newValue;
+                                  _selectedProvider =
+                                      null; // Reset provider saat ganti jenis
+                                });
+                              },
                               validator: (value) =>
                                   value == null || value.isEmpty
-                                  ? 'E-Wallet wajib dipilih'
+                                  ? 'Jenis layanan wajib dipilih'
                                   : null,
                             ),
                           ),
                           SizedBox(height: 20),
-                          _buildLabel('Nomor E-Wallet'),
+
+                          // Dropdown 2: Pilih Provider (E-Wallet atau Bank)
+                          if (_selectedJenisLayanan != null) ...[
+                            _buildLabel(
+                              _selectedJenisLayanan == 'bank'
+                                  ? 'Pilih Bank'
+                                  : 'Pilih E-Wallet',
+                            ),
+                            SizedBox(height: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: DropdownButtonFormField<String>(
+                                value: _selectedProvider,
+                                decoration: InputDecoration(
+                                  hintText: _selectedJenisLayanan == 'bank'
+                                      ? 'Pilih Bank'
+                                      : 'Pilih E-Wallet',
+                                  hintStyle: TextStyle(color: Colors.grey[400]),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                ),
+                                items:
+                                    (_selectedJenisLayanan == 'bank'
+                                            ? _bankOptions
+                                            : _eWalletOptions)
+                                        .map((String provider) {
+                                          return DropdownMenuItem<String>(
+                                            value: provider,
+                                            child: Text(provider),
+                                          );
+                                        })
+                                        .toList(),
+                                onChanged: (String? newValue) {
+                                  setState(() {
+                                    _selectedProvider = newValue;
+                                  });
+                                },
+                                validator: (value) =>
+                                    value == null || value.isEmpty
+                                    ? (_selectedJenisLayanan == 'bank'
+                                          ? 'Bank wajib dipilih'
+                                          : 'E-Wallet wajib dipilih')
+                                    : null,
+                              ),
+                            ),
+                            SizedBox(height: 20),
+                          ],
+                          _buildLabel(
+                            _selectedJenisLayanan == 'bank'
+                                ? 'Nomor Rekening'
+                                : 'Nomor E-Wallet',
+                          ),
                           SizedBox(height: 8),
                           TextFormField(
-                            controller: _nomorEWalletCtrl,
+                            controller: _nomorRekeningCtrl,
                             keyboardType: TextInputType.phone,
                             decoration: InputDecoration(
-                              hintText: 'Contoh: 081234567890',
+                              hintText: _selectedJenisLayanan == 'bank'
+                                  ? 'Contoh: 1234567890'
+                                  : 'Contoh: 081234567890',
                               hintStyle: TextStyle(color: Colors.grey[400]),
                               filled: true,
                               fillColor: Colors.white,
@@ -605,7 +706,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                 vertical: 14,
                               ),
                             ),
-                            validator: _validateEWalletNumber,
+                            validator: _selectedJenisLayanan == 'bank'
+                                ? _validateNomorRekening
+                                : _validateEWalletNumber,
                           ),
                           SizedBox(height: 20),
                           _buildLabel('Nominal Penarikan'),

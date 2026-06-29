@@ -177,11 +177,15 @@ class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
     final String? tanggalDisetujui = _penarikanData!['tanggal_disetujui']
         ?.toString();
 
+    // ✅ TAMBAHKAN 2 BARIS INI DI SINI (di luar Column)
+    final String jenisLayanan = (_penarikanData!['jenis_layanan'] ?? 'e-wallet')
+        .toString();
+    final String namaBank = (_penarikanData!['nama_bank'] ?? '-').toString();
+
     // ✅ FIX NAMA: Fallback ke user_data jika null
     String nama = (_penarikanData!['nama'] ?? '').toString();
     if (nama.isEmpty || nama == '-' || nama == 'null') {
-      // Fallback: ambil dari SharedPreferences
-      nama = 'User'; // Atau bisa load dari SharedPreferences jika perlu
+      nama = 'User';
     }
     // Tentukan warna & icon status
     Color statusColor;
@@ -370,9 +374,17 @@ class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
                       nama,
                     ), // ✅ Nama sekarang tidak kosong
                     const SizedBox(height: 8),
-                    _buildDetailRow('E-Wallet', jenisEWallet),
+                    _buildDetailRow(
+                      'Jenis Layanan',
+                      jenisLayanan == 'bank' ? namaBank : jenisEWallet,
+                    ),
                     const SizedBox(height: 8),
-                    _buildDetailRow('Nomor E-Wallet', nomorEWallet),
+                    _buildDetailRow(
+                      jenisLayanan == 'bank'
+                          ? 'Nomor Rekening'
+                          : 'Nomor E-Wallet',
+                      nomorEWallet,
+                    ),
 
                     const Divider(height: 32),
 

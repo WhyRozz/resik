@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../services/dinas_service.dart';
-<<<<<<< HEAD
 import '../../../services/desa_service.dart';
-=======
-import '../../../services/wilayah_service.dart';
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
 
 class RegisterStep1 extends StatefulWidget {
   const RegisterStep1({super.key});
@@ -16,11 +12,7 @@ class RegisterStep1 extends StatefulWidget {
 
 class _RegisterStep1State extends State<RegisterStep1> {
   final _formKey = GlobalKey<FormState>();
-<<<<<<< HEAD
-  
-=======
 
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   // Controllers
   final TextEditingController _namaCtrl = TextEditingController();
   final TextEditingController _alamatCtrl = TextEditingController();
@@ -35,7 +27,6 @@ class _RegisterStep1State extends State<RegisterStep1> {
 
   // ✅ State Kecamatan & Desa
   String? _selectedKecamatanId;
-  String? _selectedDesaId;
   List<Map<String, dynamic>> _kecamatanData = [];
   List<Map<String, dynamic>> _desaData = [];
   bool _isLoadingKecamatan = false;
@@ -43,9 +34,7 @@ class _RegisterStep1State extends State<RegisterStep1> {
 
   // Data State
   List<Map<String, dynamic>> _dinasData = [];
-  List<Map<String, dynamic>> _desaData = [];
   bool _isLoadingDinas = false;
-  bool _isLoadingDesa = false;
 
   final List<String> _genders = ['Laki-laki', 'Perempuan'];
   final List<String> _jobs = ['Masyarakat Umum', 'ASN / PNS'];
@@ -57,11 +46,7 @@ class _RegisterStep1State extends State<RegisterStep1> {
   void initState() {
     super.initState();
     _loadDinasData();
-<<<<<<< HEAD
     _loadDesaData();
-=======
-    _loadKecamatanData();
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   }
 
   Future<void> _loadDinasData() async {
@@ -73,28 +58,9 @@ class _RegisterStep1State extends State<RegisterStep1> {
     });
   }
 
-<<<<<<< HEAD
   Future<void> _loadDesaData() async {
     setState(() => _isLoadingDesa = true);
     final data = await DesaService().getAllDesa();
-=======
-  Future<void> _loadKecamatanData() async {
-    setState(() => _isLoadingKecamatan = true);
-    final data = await WilayahService.getKecamatans();
-    setState(() {
-      _kecamatanData = data;
-      _isLoadingKecamatan = false;
-    });
-  }
-
-  Future<void> _loadDesaData(String kecamatanId) async {
-    setState(() {
-      _isLoadingDesa = true;
-      _desaData = [];
-      _selectedDesaId = null;
-    });
-    final data = await WilayahService.getDesas(int.parse(kecamatanId));
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
     setState(() {
       _desaData = data;
       _isLoadingDesa = false;
@@ -123,20 +89,11 @@ class _RegisterStep1State extends State<RegisterStep1> {
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
-<<<<<<< HEAD
         _tglLahirCtrl.text = DateFormat('dd/MM/yyyy').format(picked);
-=======
-        _tglLahirCtrl.text =
-            "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
       });
     }
   }
 
-<<<<<<< HEAD
-=======
-  // ✅ VALIDASI UPDATED - SESUAI URUTAN BARU
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   bool _validateAndSave() {
     if (_namaCtrl.text.isEmpty) {
       _showSnackBar('Nama lengkap wajib diisi');
@@ -307,69 +264,6 @@ class _RegisterStep1State extends State<RegisterStep1> {
                           ),
                           const SizedBox(height: 16),
 
-<<<<<<< HEAD
-=======
-                          // 5. KECAMATAN & DESA ← HANYA MUNCUL JIKA MASYARAKAT UMUM
-                          if (_showWilayah) ...[
-                            _buildLabel('Kecamatan'),
-                            _isLoadingKecamatan
-                                ? const Center(
-                                    child: CircularProgressIndicator(
-                                      color: Color(0xFF2E7D32),
-                                    ),
-                                  )
-                                : _buildDropdownDynamic(
-                                    items: _kecamatanData,
-                                    value: _selectedKecamatanId,
-                                    hint: 'Pilih Kecamatan',
-                                    valueKey: 'id_kecamatan',
-                                    labelKey: 'nama_kecamatan',
-                                    onChanged: (val) {
-                                      setState(
-                                        () => _selectedKecamatanId = val,
-                                      );
-                                      if (val != null) {
-                                        _loadDesaData(val);
-                                      } else {
-                                        setState(() {
-                                          _desaData = [];
-                                          _selectedDesaId = null;
-                                        });
-                                      }
-                                    },
-                                  ),
-                            const SizedBox(height: 16),
-
-                            _buildLabel('Desa/Kelurahan'),
-                            _selectedKecamatanId == null
-                                ? _buildDropdownDisabled('Pilih kecamatan dulu')
-                                : _isLoadingDesa
-                                ? const Center(
-                                    child: CircularProgressIndicator(
-                                      color: Color(0xFF2E7D32),
-                                    ),
-                                  )
-                                : _desaData.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'Data desa kosong',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  )
-                                : _buildDropdownDynamic(
-                                    items: _desaData,
-                                    value: _selectedDesaId,
-                                    hint: 'Pilih Desa/Kelurahan',
-                                    valueKey: 'id_desa',
-                                    labelKey: 'nama_desa',
-                                    onChanged: (val) =>
-                                        setState(() => _selectedDesaId = val),
-                                  ),
-                            const SizedBox(height: 16),
-                          ],
-
-                          // 6. DINAS ← HANYA MUNCUL JIKA ASN/PNS
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
                           if (_showDinas) ...[
                             _buildLabel('Dinas'),
                             _isLoadingDinas
@@ -389,42 +283,27 @@ class _RegisterStep1State extends State<RegisterStep1> {
                             const SizedBox(height: 16),
                           ],
 
-<<<<<<< HEAD
                           _buildLabel('Desa/Kelurahan'),
                           _isLoadingDesa
-                              ? const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)))
+                              ? const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                )
                               : _desaData.isEmpty
-                                  ? const Center(child: Text('Data desa kosong', style: TextStyle(color: Colors.red)))
-                                  : _buildDropdownDesa(),
+                              ? const Center(
+                                  child: Text(
+                                    'Data desa kosong',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                )
+                              : _buildDropdownDesa(),
                           const SizedBox(height: 16),
 
-=======
-                          // 7. ALAMAT ← DIPINDAH KE BAWAH
-                          _buildLabel('Alamat'),
-                          _buildTextField(
-                            controller: _alamatCtrl,
-                            hint: 'Nama Jalan, RT/RW, No Rumah',
-                            maxLines: 2,
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Tombol Next
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
                           Center(
                             child: GestureDetector(
                               onTap: () {
                                 if (_validateAndSave()) {
-<<<<<<< HEAD
-                                  Navigator.pushNamed(context, '/register-step2', arguments: {
-                                    'nama': _namaCtrl.text,
-                                    'gender': _selectedGender,
-                                    'tglLahir': _selectedDate,
-                                    'alamat': _alamatCtrl.text,
-                                    'job': _selectedJob,
-                                    'dinasId': _selectedDinasId,
-                                    'desaId': _selectedDesaId,
-                                  });
-=======
                                   Navigator.pushNamed(
                                     context,
                                     '/register-step2',
@@ -433,12 +312,11 @@ class _RegisterStep1State extends State<RegisterStep1> {
                                       'gender': _selectedGender,
                                       'tglLahir': _selectedDate,
                                       'alamat': _alamatCtrl.text,
-                                      'idDesa': _selectedDesaId,
                                       'job': _selectedJob,
                                       'dinasId': _selectedDinasId,
+                                      'desaId': _selectedDesaId,
                                     },
                                   );
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
                                 }
                               },
                               child: Container(
@@ -477,11 +355,6 @@ class _RegisterStep1State extends State<RegisterStep1> {
     );
   }
 
-<<<<<<< HEAD
-=======
-  // --- Helper Widgets ---
-
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -712,12 +585,18 @@ class _RegisterStep1State extends State<RegisterStep1> {
         menuMaxHeight: 300,
         decoration: InputDecoration(
           hintText: 'Pilih Desa/Kelurahan',
-          hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Montserrat'),
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontFamily: 'Montserrat',
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
         ),
         icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF2E7D32)),
         items: _desaData.map((item) {
@@ -733,7 +612,8 @@ class _RegisterStep1State extends State<RegisterStep1> {
         }).toList(),
         onChanged: (val) => setState(() => _selectedDesaId = val),
         validator: (value) {
-          if (value == null || value.isEmpty) return 'Desa/Kelurahan wajib dipilih';
+          if (value == null || value.isEmpty)
+            return 'Desa/Kelurahan wajib dipilih';
           return null;
         },
       ),

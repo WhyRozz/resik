@@ -41,26 +41,8 @@ class MyApp extends StatelessWidget {
         '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => const LoginScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
-<<<<<<< HEAD
         '/register': (context) => const RegisterScreen(),
-        
-=======
-        '/register-step1': (context) => const RegisterStep1(),
-        '/register-step2': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
-          return RegisterStep2(
-            nama: args['nama'] ?? '',
-            gender: args['gender'],
-            tglLahir: args['tglLahir'],
-            alamat: args['alamat'] ?? '',
-            job: args['job'],
-            dinasId: args['dinasId'],
-            idDesa: args['idDesa'],
-          );
-        },
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
+
         '/verify-otp': (context) {
           final email = ModalRoute.of(context)!.settings.arguments as String;
           return VerifyOtpScreen(email: email);

@@ -519,6 +519,9 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
     final String nomorEWallet = (data['nomor_ewallet'] ?? '-').toString();
     final double jumlahUang = (data['jumlah_uang'] ?? 0).toDouble();
     final String? alasanPenolakan = data['alasan_penolakan']?.toString();
+    final String jenisLayanan = (data['jenis_layanan'] ?? 'e-wallet')
+        .toString();
+    final String namaBank = (data['nama_bank'] ?? '').toString();
 
     // ✅ WARNA STATUS (3 STATUS SAJA)
     Color statusColor;
@@ -612,9 +615,11 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    Icons.account_balance_wallet,
-                    color: Color(0xFF4CAF50),
+                  child: Icon(
+                    jenisLayanan == 'bank'
+                        ? Icons.account_balance
+                        : Icons.account_balance_wallet,
+                    color: const Color(0xFF4CAF50),
                     size: 24,
                   ),
                 ),
@@ -624,7 +629,7 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        jenisEWallet,
+                        jenisLayanan == 'bank' ? namaBank : jenisEWallet,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,

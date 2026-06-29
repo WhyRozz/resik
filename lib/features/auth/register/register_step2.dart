@@ -11,11 +11,7 @@ class RegisterStep2 extends StatefulWidget {
   final String alamat;
   final String? job;
   final String? dinasId;
-<<<<<<< HEAD
   final String? desaId;
-=======
-  final String? idDesa;
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
 
   const RegisterStep2({
     super.key,
@@ -25,11 +21,7 @@ class RegisterStep2 extends StatefulWidget {
     required this.alamat,
     required this.job,
     required this.dinasId,
-<<<<<<< HEAD
     required this.desaId,
-=======
-    required this.idDesa,
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   });
 
   @override
@@ -42,23 +34,12 @@ class _RegisterStep2State extends State<RegisterStep2>
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
   final TextEditingController _confirmPasswordCtrl = TextEditingController();
-<<<<<<< HEAD
-  
+
   final GlobalKey _passwordFieldKey = GlobalKey();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  
-=======
 
-  final GlobalKey _passwordFieldKey =
-      GlobalKey(); // ✅ Key untuk shake animation
-
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-
-  // ✅ Animation controller untuk shake
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
 
@@ -69,19 +50,11 @@ class _RegisterStep2State extends State<RegisterStep2>
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-<<<<<<< HEAD
-    _shakeAnimation = Tween<double>(begin: -10, end: 10).chain(
-      CurveTween(curve: Curves.easeInOut),
-    ).animate(_shakeController);
-    
-=======
     _shakeAnimation = Tween<double>(
       begin: -10,
       end: 10,
     ).chain(CurveTween(curve: Curves.easeInOut)).animate(_shakeController);
 
-    // ✅ LISTENER untuk update real-time saat user mengetik password
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
     _passwordCtrl.addListener(() {
       setState(() {});
     });
@@ -148,11 +121,6 @@ class _RegisterStep2State extends State<RegisterStep2>
   void _handleRegister() async {
     final password = _passwordCtrl.text.trim();
     final confirmPassword = _confirmPasswordCtrl.text.trim();
-<<<<<<< HEAD
-=======
-
-    // Validasi password kuat
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
     final validation = _validatePassword(password);
 
     if (password.isEmpty) {
@@ -215,19 +183,15 @@ class _RegisterStep2State extends State<RegisterStep2>
         'password': password,
         'no_telepon': _teleponCtrl.text,
         'jenis_kelamin': widget.gender,
-        'tanggal_lahir': widget.tglLahir != null 
-            ? DateFormat('yyyy-MM-dd').format(widget.tglLahir!) 
+        'tanggal_lahir': widget.tglLahir != null
+            ? DateFormat('yyyy-MM-dd').format(widget.tglLahir!)
             : null,
         'alamat': widget.alamat,
-<<<<<<< HEAD
         'id_desa': widget.desaId != null ? int.parse(widget.desaId!) : null,
-        if (tipeUser == 'pns') 
-          'id_dinas': widget.dinasId != null ? int.parse(widget.dinasId!) : null,
-=======
-        'pekerjaan': widget.job,
-        'id_dinas': widget.dinasId != null ? int.parse(widget.dinasId!) : null,
-        'id_desa': widget.idDesa != null ? int.parse(widget.idDesa!) : null,
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
+        if (tipeUser == 'pns')
+          'id_dinas': widget.dinasId != null
+              ? int.parse(widget.dinasId!)
+              : null,
       };
 
       debugPrint("📤 Register Request: ${jsonEncode(requestData)}");
@@ -307,7 +271,9 @@ class _RegisterStep2State extends State<RegisterStep2>
                   padding: const EdgeInsets.all(20),
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(30),
+                    ),
                   ),
                   child: SingleChildScrollView(
                     child: Column(
@@ -330,11 +296,6 @@ class _RegisterStep2State extends State<RegisterStep2>
                         const SizedBox(height: 16),
 
                         _buildLabel('Kata Sandi'),
-<<<<<<< HEAD
-=======
-
-                        // ✅ SHAKE ANIMATION WRAPPER
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
                         AnimatedBuilder(
                           animation: _shakeAnimation,
                           builder: (context, child) {
@@ -350,7 +311,9 @@ class _RegisterStep2State extends State<RegisterStep2>
                             obscureText: _obscurePassword,
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
                                 color: const Color(0xFF2E7D32),
                               ),
                               onPressed: () {
@@ -361,17 +324,10 @@ class _RegisterStep2State extends State<RegisterStep2>
                             ),
                           ),
                         ),
-<<<<<<< HEAD
-                        _buildPasswordRequirements(passwordValidation, isStrongPassword),
-=======
-
-                        // ✅ PASSWORD REQUIREMENTS INDICATOR
                         _buildPasswordRequirements(
                           passwordValidation,
                           isStrongPassword,
                         ),
-
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
                         const SizedBox(height: 16),
 
                         _buildLabel('Konfirmasi Kata Sandi'),
@@ -381,12 +337,15 @@ class _RegisterStep2State extends State<RegisterStep2>
                           obscureText: _obscureConfirmPassword,
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                               color: const Color(0xFF2E7D32),
                             ),
                             onPressed: () {
                               setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
                               });
                             },
                           ),
@@ -478,30 +437,34 @@ class _RegisterStep2State extends State<RegisterStep2>
         controller: controller,
         keyboardType: keyboardType,
         obscureText: obscureText,
-        style: const TextStyle(color: Color(0xFF1B5E20), fontFamily: 'Montserrat'),
+        style: const TextStyle(
+          color: Color(0xFF1B5E20),
+          fontFamily: 'Montserrat',
+        ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[400], fontFamily: 'Montserrat'),
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontFamily: 'Montserrat',
+          ),
           suffixIcon: suffixIcon,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
       ),
     );
   }
 
-<<<<<<< HEAD
-  Widget _buildPasswordRequirements(Map<String, bool> validation, bool isStrong) {
-=======
-  // ✅ WIDGET PASSWORD REQUIREMENTS
   Widget _buildPasswordRequirements(
     Map<String, bool> validation,
     bool isStrong,
   ) {
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),
@@ -518,14 +481,14 @@ class _RegisterStep2State extends State<RegisterStep2>
         children: [
           const Text(
             'Persyaratan Password:',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1B5E20),
+            ),
           ),
           const SizedBox(height: 8),
           _buildRequirementItem('Minimal 8 karakter', validation['minLength']!),
-<<<<<<< HEAD
-          _buildRequirementItem('Huruf besar (A-Z)', validation['hasUppercase']!),
-          _buildRequirementItem('Huruf kecil (a-z)', validation['hasLowercase']!),
-=======
           _buildRequirementItem(
             'Huruf besar (A-Z)',
             validation['hasUppercase']!,
@@ -534,7 +497,6 @@ class _RegisterStep2State extends State<RegisterStep2>
             'Huruf kecil (a-z)',
             validation['hasLowercase']!,
           ),
->>>>>>> 91eb0b8007f870f0e3c182657f4973dea0a01bcd
           _buildRequirementItem('Angka (0-9)', validation['hasNumber']!),
           _buildRequirementItem('Simbol (!@#\$%&*)', validation['hasSymbol']!),
         ],
