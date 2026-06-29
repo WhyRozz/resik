@@ -411,40 +411,43 @@ class _FormTransaksiSetorScreenV2State
                 // ✅ TOMBOL DENGAN PROTEKSI EXTRA
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    // ✅ DISABLE jika sedang processing
+                  child: ElevatedButton(
                     onPressed: _isProcessing ? null : _handleSubmit,
 
-                    // ✅ Force rebuild saat status berubah
                     key: ValueKey<bool>(_isProcessing),
 
-                    icon: _isProcessing
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(Icons.save),
-                    label: Text(
-                      _isProcessing ? 'Menyimpan...' : 'Simpan Transaksi',
-                    ),
                     style: ElevatedButton.styleFrom(
-                      // ✅ Visual feedback yang jelas
                       backgroundColor: _isProcessing
                           ? Colors.grey[400]
                           : const Color(0xFF4CAF50),
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: Colors.grey[400],
                       disabledForegroundColor: Colors.grey,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 18,
+                      ), // sedikit lebih tinggi
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: _isProcessing ? 0 : 2,
                     ),
+
+                    child: _isProcessing
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Simpan Transaksi',
+                            style: TextStyle(
+                              fontSize: 20, // <-- Besarkan teks
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
 

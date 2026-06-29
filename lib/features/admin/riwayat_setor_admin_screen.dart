@@ -585,7 +585,6 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
             ),
           ),
 
-
           // ✅ TRANSACTION LIST
           // ✅ TRANSACTION LIST
           Expanded(
@@ -800,7 +799,7 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
                       item['berat'].toDouble(),
                     ),
                     icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Konfirmasi'),
+                    label: const Text('Setujui'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4CAF50),
                     ),

@@ -220,6 +220,7 @@ class _RiwayatPenjemputanAdminScreenState
   }
 
   Widget _buildPenjemputanCard(Map<String, dynamic> item) {
+    debugPrint(item.toString());
     final String status = (item['status'] ?? 'diproses')
         .toString()
         .toLowerCase();
@@ -227,6 +228,7 @@ class _RiwayatPenjemputanAdminScreenState
         ? Colors.green
         : (status == 'ditolak' ? Colors.red : Colors.orange);
     final berat = (item['berat'] ?? 0).toDouble();
+    final String? fotoUrl = item['foto'];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -244,6 +246,39 @@ class _RiwayatPenjemputanAdminScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (fotoUrl != null && fotoUrl.isNotEmpty) ...[
+            const SizedBox(height: 12),
+
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                fotoUrl,
+                width: double.infinity,
+                height: 180,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const SizedBox(
+                    height: 180,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 180,
+                    color: Colors.grey.shade200,
+                    child: const Center(
+                      child: Icon(
+                        Icons.broken_image,
+                        size: 40,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
           Row(
             children: [
               Container(
@@ -378,9 +413,7 @@ class _RiwayatPenjemputanAdminScreenState
                 // Scan logic
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const QrBarcodeScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const QrBarcodeScreen()),
                 );
               } else if (index == 2) {
                 Navigator.push(
