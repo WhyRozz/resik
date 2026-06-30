@@ -93,7 +93,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _jenisKelaminCtrl.text = _userData['jenis_kelamin'] ?? '';
 
         final tipe = _userData['tipe'] ?? 'masyarakat';
-        _pekerjaanCtrl.text = tipe == 'pns' ? 'PNS / ASN' : 'Masyarakat Umum';
+
+        if (tipe == 'pns') {
+          _pekerjaanCtrl.text = 'ASN/PNS - ${_userData['nama_dinas'] ?? '-'}';
+        } else {
+          _pekerjaanCtrl.text =
+              'Masyarakat - ${_userData['nama_kecamatan'] ?? '-'}, ${_userData['nama_desa'] ?? '-'}';
+        }
 
         // Informasi Kontak
         _emailCtrl.text = _userData['email'] ?? '';
@@ -835,7 +841,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final userType = _userData['tipe'] ?? 'masyarakat';
-    final userRole = userType == 'pns' ? 'PNS / ASN' : 'Masyarakat';
+    final userRole = userType == 'pns' ? 'ASN/PNS' : 'Masyarakat';
     final barcodeId = _userData['barcode_id'] ?? '-';
 
     return Scaffold(

@@ -13,7 +13,6 @@ class DesaService {
           .get(Uri.parse('${ApiConfig.baseUrl}/desa'))
           .timeout(const Duration(seconds: 10));
 
-
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         if (result['status'] == 'success') {
@@ -35,10 +34,32 @@ class DesaService {
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
+
         if (result['status'] == 'success') {
           return List<Map<String, dynamic>>.from(result['data']);
         }
       }
+
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAllKecamatan() async {
+    try {
+      final response = await http
+          .get(Uri.parse('${ApiConfig.baseUrl}/kecamatan'))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+
+        if (result['status'] == 'success') {
+          return List<Map<String, dynamic>>.from(result['data']);
+        }
+      }
+
       return [];
     } catch (e) {
       return [];

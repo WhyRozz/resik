@@ -223,7 +223,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               _buildTextField(
                 label: 'Nama Lengkap',
-                hint: 'Contoh: Budi Santoso',
+                hint: 'Masukkan Nama Lengkap',
                 keyName: 'nama',
                 icon: Icons.person_outline,
               ),
@@ -241,66 +241,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 icon: Icons.calendar_today,
               ),
               const SizedBox(height: 16),
-              // Kecamatan (tanpa search)
-              _buildSimpleDropdown(
-                label: 'Kecamatan',
-                keyName: 'kecamatan',
-                items: _kecamatanList,
-                itemKey: 'id_kecamatan',
-                itemLabel: 'nama_kecamatan',
-                icon: Icons.location_city,
-                isLoading: _isLoadingKecamatan,
-                onSelected: (val) {
-                  if (val != null) {
-                    final kecamatan = _kecamatanList.firstWhere(
-                      (k) => k['id_kecamatan'] == val,
-                      orElse: () => {},
-                    );
-                    _loadDesa(kecamatan['id_kecamatan']);
-                    // Reset desa saat kecamatan berubah
-                    _formData['desa'] = null;
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Desa (tanpa search, hanya enabled jika kecamatan dipilih)
-              _buildSimpleDropdown(
-                label: 'Desa/Kelurahan',
-                keyName: 'desa',
-                items: _desaList,
-                itemKey: 'id_desa',
-                itemLabel: 'nama_desa',
-                icon: Icons.home_work_outlined,
-                isLoading: _isLoadingDesa,
-                enabled: _formData['kecamatan'] != null && _desaList.isNotEmpty,
-              ),
-
-              const SizedBox(height: 16),
-
-              _buildTextField(
-                label: 'Alamat Lengkap',
-                hint: 'Jl. Mawar No. 10, RT/RW, Kode Pos',
-                keyName: 'alamat',
-                icon: Icons.location_on,
-                maxLines: 2,
-              ),
-
-              const SizedBox(height: 16),
 
               // Pekerjaan
               _buildDropdownStatic(
                 label: 'Pekerjaan',
                 keyName: 'pekerjaan',
-                items: ['Masyarakat Umum', 'ASN / PNS'],
+                items: ['Masyarakat', 'ASN/PNS'],
                 icon: Icons.work_outline,
                 onChanged: (val) {
-                  setState(() {});
+                  setState(() {
+                    _formData['kecamatan'] = null;
+                    _formData['desa'] = null;
+                    _formData['dinas'] = null;
+
+                    _desaList.clear();
+                  });
                 },
               ),
               const SizedBox(height: 16),
+
+              if (_formData['pekerjaan'] == 'Masyarakat') ...[
+                // Kecamatan
+                _buildSimpleDropdown(
+                  label: 'Kecamatan',
+                  keyName: 'kecamatan',
+                  items: _kecamatanList,
+                  itemKey: 'id_kecamatan',
+                  itemLabel: 'nama_kecamatan',
+                  icon: Icons.location_city,
+                  isLoading: _isLoadingKecamatan,
+                  onSelected: (val) {
+                    if (val != null) {
+                      final kecamatan = _kecamatanList.firstWhere(
+                        (k) => k['id_kecamatan'] == val,
+                        orElse: () => {},
+                      );
+                      _loadDesa(kecamatan['id_kecamatan']);
+                      // Reset desa saat kecamatan berubah
+                      _formData['desa'] = null;
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Desa (tanpa search, hanya enabled jika kecamatan dipilih)
+                _buildSimpleDropdown(
+                  label: 'Desa/Kelurahan',
+                  keyName: 'desa',
+                  items: _desaList,
+                  itemKey: 'id_desa',
+                  itemLabel: 'nama_desa',
+                  icon: Icons.home_work_outlined,
+                  isLoading: _isLoadingDesa,
+                  enabled:
+                      _formData['kecamatan'] != null && _desaList.isNotEmpty,
+                ),
+
+                const SizedBox(height: 16),
+              ],
+
               // Dinas (Hanya muncul jika ASN/PNS)
-              if (_formData['pekerjaan'] == 'ASN / PNS') ...[
+              if (_formData['pekerjaan'] == 'ASN/PNS') ...[
                 _buildDropdown(
                   label: 'Dinas',
                   keyName: 'dinas',
@@ -312,6 +313,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
+
+              _buildTextField(
+                label: 'Alamat Lengkap',
+                hint: 'Contoh: Jl. Mawar No. 10, RT/RW',
+                keyName: 'alamat',
+                icon: Icons.location_on,
+                maxLines: 2,
+              ),
+
+              const SizedBox(height: 16),
             ],
           ),
           const SizedBox(height: 30),
@@ -618,6 +629,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               : DropdownButtonHideUnderline(
                   child: DropdownButton<dynamic>(
                     value: _formData[keyName],
+                    isExpanded: true,
+                    itemHeight: null,
+                    menuMaxHeight: 350,
                     hint: Row(
                       children: [
                         Icon(icon, size: 18, color: const Color(0xFF9CA3AF)),
@@ -634,11 +648,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     items: items.map((item) {
                       return DropdownMenuItem(
                         value: item[itemKey],
-                        child: Text(
-                          item[itemLabel],
-                          style: const TextStyle(fontFamily: 'Poppins'),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: Text(
+                            item[itemLabel],
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14,
+                              height: 1.35,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       );
                     }).toList(),
@@ -647,7 +668,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         _formData[keyName] = val;
                       });
                     },
-                    isExpanded: true,
                     underline: const SizedBox(),
                     dropdownColor: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -994,13 +1014,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   strokeWidth: 2,
                 ),
               )
-            : Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  fontFamily: 'Poppins',
+            : Center(
+                child: Text(
+                  text,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                  ),
                 ),
               ),
       ),
@@ -1065,21 +1088,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _showError('Tanggal lahir wajib dipilih');
       return false;
     }
-    if (_formData['kecamatan'] == null) {
-      _showError('Kecamatan wajib dipilih');
-      return false;
-    }
-    if (_formData['desa'] == null) {
-      _showError('Desa/Kelurahan wajib dipilih');
-      return false;
-    }
     if (_formData['pekerjaan'] == null) {
       _showError('Pekerjaan wajib dipilih');
       return false;
     }
-    if (_formData['pekerjaan'] == 'ASN / PNS' && _formData['dinas'] == null) {
-      _showError('Dinas wajib dipilih untuk ASN/PNS');
-      return false;
+
+    if (_formData['pekerjaan'] == 'Masyarakat') {
+      if (_formData['kecamatan'] == null) {
+        _showError('Kecamatan wajib dipilih');
+        return false;
+      }
+
+      if (_formData['desa'] == null) {
+        _showError('Desa wajib dipilih');
+        return false;
+      }
+    }
+
+    if (_formData['pekerjaan'] == 'ASN/PNS') {
+      if (_formData['dinas'] == null) {
+        _showError('Dinas wajib dipilih');
+        return false;
+      }
     }
     if ((_formData['alamat'] ?? '').isEmpty) {
       _showError('Alamat wajib diisi');
@@ -1129,7 +1159,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       // ✅ TENTUKAN TIPE USER BERDASARKAN PEKERJAAN
-      final String tipeUser = _formData['pekerjaan'] == 'ASN / PNS'
+      final String tipeUser = _formData['pekerjaan'] == 'ASN/PNS'
           ? 'pns'
           : 'masyarakat';
 
@@ -1145,9 +1175,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ? DateFormat('yyyy-MM-dd').format(_formData['tglLahir'])
             : null,
         'alamat': _formData['alamat'],
-        'id_desa': _formData['desa'],
+        if (tipeUser == 'masyarakat') 'id_desa': _formData['desa'],
 
-        // ✅ HANYA KIRIM id_dinas JIKA PNS
         if (tipeUser == 'pns') 'id_dinas': _formData['dinas'],
       };
 
