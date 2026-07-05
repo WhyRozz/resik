@@ -44,7 +44,9 @@ class _LaporanScreenState extends State<LaporanScreen> {
       setState(() {
         _userData = jsonDecode(userDataStr);
         _namaCtrl.text = _userData?['nama'] ?? '';
-        _tanggalCtrl.text = DateFormat('dd-MM-yyyy').format(DateTime.now());
+        _tanggalCtrl.text = DateFormat(
+          'dd-MM-yyyy HH:mm',
+        ).format(DateTime.now());
       });
     }
   }
@@ -299,9 +301,9 @@ class _LaporanScreenState extends State<LaporanScreen> {
           TextButton(
             onPressed: () {
               Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RiwayatLaporanScreen()),
-                );
+                context,
+                MaterialPageRoute(builder: (_) => const RiwayatLaporanScreen()),
+              );
             },
             child: const Text(
               'OK',
@@ -506,9 +508,9 @@ class _LaporanScreenState extends State<LaporanScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HomeUserScreen()),
-                ),
+            context,
+            MaterialPageRoute(builder: (_) => const HomeUserScreen()),
+          ),
         ),
         title: const Text(
           'Pengajuan Laporan',
@@ -626,7 +628,7 @@ class _LaporanScreenState extends State<LaporanScreen> {
                       readOnly: true,
                       onTap: () => setState(
                         () => _tanggalCtrl.text = DateFormat(
-                          'dd-MM-yyyy',
+                          'dd-MM-yyyy HH:mm',
                         ).format(DateTime.now()),
                       ),
                       decoration: _inputDecoration('Pilih tanggal'),

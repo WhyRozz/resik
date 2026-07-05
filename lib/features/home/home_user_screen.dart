@@ -556,7 +556,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Selamat Datang',
+                    'Selamat Datang, Sobat Resik',
                     style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                   Text(

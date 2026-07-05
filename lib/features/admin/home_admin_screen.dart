@@ -414,7 +414,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Selamat Datang, Admin',
+                  'Selamat Datang Petugas',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,

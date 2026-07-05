@@ -638,7 +638,7 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        nomorEWallet,
+                        '${jenisLayanan == 'bank' ? 'No. Rekening: ' : 'No. E-Wallet: '}$nomorEWallet',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,

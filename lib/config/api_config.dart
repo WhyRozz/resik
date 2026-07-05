@@ -1,6 +1,6 @@
 class ApiConfig {
   // 🔧 KONTROL MODE: false = Local/Maintenance, true = Production
-  static const bool isProduction = false;
+  static const bool isProduction = true;
 
   // 🌐 Base URL dinamis berdasarkan mode
   static String get _baseUrl {
