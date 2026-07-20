@@ -15,9 +15,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   int _currentStep = 0;
   final _formKey = GlobalKey<FormState>();
 
-  // ✅ DATA & CONTROLLERS - PERSIST ACROSS BUILDS
+  // DATA & CONTROLLERS - PERSIST ACROSS BUILDS
   final Map<String, dynamic> _formData = {};
   final Map<String, TextEditingController> _controllers = {};
+  final Map<String, bool> _obscureStates = {};
   bool _isLoading = false;
 
   // Data Lists
@@ -278,7 +279,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       );
                       _loadDesa(kecamatan['id_kecamatan']);
                       // Reset desa saat kecamatan berubah
-                      _formData['desa'] = null;
+                      setState(() {
+                        // TAMBAHKAN setState
+                        _formData['desa'] = null;
+                      });
                     }
                   },
                 ),
@@ -300,8 +304,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
               ],
 
-              // Dinas (Hanya muncul jika ASN/PNS)
+              // Dinas + Wilayah (Hanya muncul jika ASN/PNS)
               if (_formData['pekerjaan'] == 'ASN/PNS') ...[
+                // 1. Dinas
                 _buildDropdown(
                   label: 'Dinas',
                   keyName: 'dinas',
@@ -310,6 +315,52 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   itemLabel: 'nama_dinas',
                   icon: Icons.business,
                   isLoading: _isLoadingDinas,
+                  onSelected: (val) {
+                    // Reset kecamatan & desa saat dinas berubah
+                    setState(() {
+                      _formData['kecamatanPns'] = null;
+                      _formData['desaPns'] = null;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // 2. Kecamatan (untuk PNS)
+                _buildSimpleDropdown(
+                  label: 'Kecamatan',
+                  keyName: 'kecamatanPns',
+                  items: _kecamatanList, // Pakai list kecamatan yang sama
+                  itemKey: 'id_kecamatan',
+                  itemLabel: 'nama_kecamatan',
+                  icon: Icons.location_city,
+                  isLoading: _isLoadingKecamatan,
+                  onSelected: (val) {
+                    if (val != null) {
+                      final kecamatan = _kecamatanList.firstWhere(
+                        (k) => k['id_kecamatan'] == val,
+                        orElse: () => {},
+                      );
+                      _loadDesa(kecamatan['id_kecamatan']);
+                      // Reset desa saat kecamatan berubah
+                      setState(() {
+                        _formData['desaPns'] = null;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // 3. Desa (untuk PNS)
+                _buildSimpleDropdown(
+                  label: 'Desa/Kelurahan',
+                  keyName: 'desaPns',
+                  items: _desaList,
+                  itemKey: 'id_desa',
+                  itemLabel: 'nama_desa',
+                  icon: Icons.home_work_outlined,
+                  isLoading: _isLoadingDesa,
+                  enabled:
+                      _formData['kecamatanPns'] != null && _desaList.isNotEmpty,
                 ),
                 const SizedBox(height: 16),
               ],
@@ -326,9 +377,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ],
           ),
           const SizedBox(height: 30),
-          _buildButton('Lanjut', () {
-            if (_validateStep1()) _nextStep();
-          }),
+          Container(
+            width: double.infinity,
+            height: 54,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2E7D32), Color(0xFF22C55E)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF22C55E).withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  if (_validateStep1()) _nextStep();
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: const Center(
+                  child: Text(
+                    'Lanjut',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -363,12 +448,72 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 30),
           Row(
             children: [
-              Expanded(child: _buildButtonOutline('Kembali', _prevStep)),
-              const SizedBox(width: 16),
+              // Tombol Kembali
               Expanded(
-                child: _buildButton('Lanjut', () {
-                  if (_validateStep2()) _nextStep();
-                }),
+                child: Container(
+                  height: 54,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: const Color(0xFFE5E7EB),
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Material(
+                    color: Colors.white,
+                    child: InkWell(
+                      onTap: _prevStep,
+                      borderRadius: BorderRadius.circular(14),
+                      child: const Center(
+                        child: Text(
+                          'Kembali',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF111827),
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Tombol Lanjut
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    if (_validateStep2()) _nextStep();
+                  },
+                  child: Container(
+                    height: 54,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2E7D32), Color(0xFF22C55E)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF22C55E).withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Lanjut',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -408,12 +553,76 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 30),
           Row(
             children: [
-              Expanded(child: _buildButtonOutline('Kembali', _prevStep)),
+              Expanded(
+                child: Container(
+                  height: 54,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: const Color(0xFFE5E7EB),
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Material(
+                    color: Colors.white,
+                    child: InkWell(
+                      onTap: _prevStep,
+                      borderRadius: BorderRadius.circular(14),
+                      child: const Center(
+                        child: Text(
+                          'Kembali',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF111827),
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildButton(
-                  _isLoading ? 'Mendaftar...' : 'Daftar Sekarang',
-                  _isLoading ? null : _submitRegistration,
+                child: GestureDetector(
+                  onTap: _isLoading ? null : _submitRegistration,
+                  child: Container(
+                    height: 54,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2E7D32), Color(0xFF22C55E)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF22C55E).withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text(
+                              'Daftar Sekarang',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -591,6 +800,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String itemLabel,
     required IconData icon,
     bool isLoading = false,
+    Function(dynamic)? onSelected,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,6 +877,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       setState(() {
                         _formData[keyName] = val;
                       });
+                      if (onSelected != null) onSelected(val);
                     },
                     underline: const SizedBox(),
                     dropdownColor: Colors.white,
@@ -801,6 +1012,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
               initialDate: DateTime(2000),
               firstDate: DateTime(1950),
               lastDate: DateTime.now().subtract(const Duration(days: 365 * 13)),
+
+              // ✅ UBAH TEKS JUDUL DAN TOMBOL
+              helpText: 'Tanggal Lahir', // Judul atas
+              cancelText: 'Batal', // Tombol kiri
+              confirmText: 'Konfirmasi', // Tombol kanan
+
               builder: (context, child) {
                 return Theme(
                   data: Theme.of(context).copyWith(
@@ -866,64 +1083,82 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String keyName,
     required String hint,
   }) {
-    bool obscure = true;
-    return StatefulBuilder(
-      builder: (context, setStateLocal) {
-        final controller = _getController(
-          keyName,
-          initialValue: _formData[keyName]?.toString() ?? '',
-        );
+    // ✅ Initialize state jika belum ada
+    if (!_obscureStates.containsKey(keyName)) {
+      _obscureStates[keyName] = true;
+    }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF6B7280),
-                fontFamily: 'Poppins',
-              ),
+    final controller = _getController(
+      keyName,
+      initialValue: _formData[keyName]?.toString() ?? '',
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+            fontFamily: 'Poppins',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+          ),
+          child: TextField(
+            controller: controller,
+            obscureText: _obscureStates[keyName]!, // ✅ Pakai state dari class
+            style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 14,
+              color: Color(0xFF111827),
             ),
-            const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(
+                color: Color(0xFF9CA3AF),
+                fontFamily: 'Poppins',
+                fontSize: 13,
               ),
-              child: TextField(
-                controller: controller,
-                obscureText: obscure,
-                style: const TextStyle(fontFamily: 'Poppins'),
-                decoration: InputDecoration(
-                  hintText: hint,
-                  hintStyle: const TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontFamily: 'Poppins',
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.lock_outline,
-                    color: Color(0xFF22C55E),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      obscure ? Icons.visibility_off : Icons.visibility,
-                      color: Colors.grey,
-                    ),
-                    onPressed: () {
-                      setStateLocal(() => obscure = !obscure);
-                    },
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.all(14),
+              prefixIcon: Container(
+                margin: const EdgeInsets.only(right: 8),
+                child: const Icon(
+                  Icons.lock_outline_rounded,
+                  color: Color(0xFF22C55E),
+                  size: 20,
                 ),
               ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureStates[keyName]!
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: const Color(0xFF6B7280),
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscureStates[keyName] =
+                        !_obscureStates[keyName]!; // Update state
+                  });
+                },
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
             ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 
@@ -932,60 +1167,90 @@ class _RegisterScreenState extends State<RegisterScreen> {
     bool isStrong,
   ) {
     return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isStrong ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFE3F2FD), // ← Biru muda (BLUE)
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isStrong ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
-          width: 1,
+          color: const Color(0xFF2196F3), // ← Border BIRU
+          width: 1.5,
         ),
       ),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'Persyaratan Password:',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
               color: Color(0xFF1B5E20),
+              fontFamily: 'Poppins',
             ),
           ),
-          const SizedBox(height: 8),
-          _buildRequirementItem('Minimal 8 karakter', validation['minLength']!),
-          _buildRequirementItem(
+          const SizedBox(height: 12),
+          _buildModernRequirementItem(
+            'Minimal 8 karakter',
+            validation['minLength']!,
+          ),
+          _buildModernRequirementItem(
             'Huruf besar (A-Z)',
             validation['hasUppercase']!,
           ),
-          _buildRequirementItem(
+          _buildModernRequirementItem(
             'Huruf kecil (a-z)',
             validation['hasLowercase']!,
           ),
-          _buildRequirementItem('Angka (0-9)', validation['hasNumber']!),
-          _buildRequirementItem('Simbol (!@#\$%&*)', validation['hasSymbol']!),
+          _buildModernRequirementItem('Angka (0-9)', validation['hasNumber']!),
+          _buildModernRequirementItem(
+            'Simbol (!@#\$%&*)',
+            validation['hasSymbol']!,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildRequirementItem(String text, bool isMet) {
+  Widget _buildModernRequirementItem(String text, bool isMet) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          Icon(
-            isMet ? Icons.check_circle : Icons.circle_outlined,
-            size: 16,
-            color: isMet ? const Color(0xFF4CAF50) : Colors.grey[400],
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isMet
+                    ? const Color(0xFF4CAF50)
+                    : const Color(0xFFB0B0B0),
+                width: 2,
+              ),
+            ),
+            child: isMet
+                ? Center(
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF4CAF50),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  )
+                : null,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Text(
             text,
             style: TextStyle(
-              fontSize: 11,
-              color: isMet ? const Color(0xFF1B5E20) : Colors.grey[600],
+              fontSize: 13,
+              color: isMet ? const Color(0xFF1B5E20) : const Color(0xFF6B7280),
+              fontWeight: isMet ? FontWeight.w600 : FontWeight.normal,
+              fontFamily: 'Poppins',
             ),
           ),
         ],
@@ -995,35 +1260,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildButton(String text, VoidCallback? onTap) {
     return SizedBox(
-      height: 50,
+      height: 54,
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF22C55E),
           elevation: 0,
+          shadowColor: const Color(0xFF22C55E).withOpacity(0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
         ),
         child: _isLoading
             ? const SizedBox(
-                height: 20,
-                width: 20,
+                height: 22,
+                width: 22,
                 child: CircularProgressIndicator(
                   color: Colors.white,
-                  strokeWidth: 2,
+                  strokeWidth: 2.5,
                 ),
               )
-            : Center(
-                child: Text(
-                  text,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontFamily: 'Poppins',
-                  ),
+            : Text(
+                text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
                 ),
               ),
       ),
@@ -1032,19 +1297,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildButtonOutline(String text, VoidCallback onTap) {
     return SizedBox(
-      height: 50,
+      height: 54,
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Color(0xFFE5E7EB)),
+          side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
         ),
         child: Text(
           text,
           style: const TextStyle(
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
             color: Color(0xFF111827),
             fontFamily: 'Poppins',
@@ -1110,6 +1376,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _showError('Dinas wajib dipilih');
         return false;
       }
+      // ✅ VALIDASI KECAMATAN DAN DESA UNTUK PNS
+      if (_formData['kecamatanPns'] == null) {
+        _showError('Kecamatan wajib dipilih');
+        return false;
+      }
+      if (_formData['desaPns'] == null) {
+        _showError('Desa wajib dipilih');
+        return false;
+      }
     }
     if ((_formData['alamat'] ?? '').isEmpty) {
       _showError('Alamat wajib diisi');
@@ -1164,7 +1439,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           : 'masyarakat';
 
       final requestData = {
-        'tipe': tipeUser, // ✅ KIRIM 'tipe', bukan 'pekerjaan'
+        'tipe': tipeUser,
         'nama': _formData['nama'],
         'email': _formData['email'],
         'password': password,
@@ -1175,7 +1450,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ? DateFormat('yyyy-MM-dd').format(_formData['tglLahir'])
             : null,
         'alamat': _formData['alamat'],
-        if (tipeUser == 'masyarakat') 'id_desa': _formData['desa'],
+
+        // KIRIM id_desa UNTUK SEMUA TIPE USER
+        'id_desa': tipeUser == 'masyarakat'
+            ? _formData['desa']
+            : _formData['desaPns'],
 
         if (tipeUser == 'pns') 'id_dinas': _formData['dinas'],
       };

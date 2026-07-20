@@ -12,8 +12,6 @@
     <!-- IZIN BACA MEDIA -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-
-
     <application
         android:label="RESIK"
         android:name="${applicationName}"
@@ -23,6 +21,10 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCD3LHUuyXeLh4kxFF3lkIql8OGOkoY2YM" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_logo_r_removebg_preview" />
 
         <activity
             android:name=".MainActivity"

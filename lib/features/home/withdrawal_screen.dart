@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../config/api_config.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 
 class WithdrawalScreen extends StatefulWidget {
   const WithdrawalScreen({super.key});
@@ -14,7 +15,7 @@ class WithdrawalScreen extends StatefulWidget {
 
 class _WithdrawalScreenState extends State<WithdrawalScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _namaCtrl = TextEditingController();
+  final _namaPenerimaCtrl = TextEditingController();
   final _nomorRekeningCtrl = TextEditingController();
   final _nominalCtrl = TextEditingController();
 
@@ -46,7 +47,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
 
   @override
   void dispose() {
-    _namaCtrl.dispose();
+    _namaPenerimaCtrl.dispose();
     _nomorRekeningCtrl.dispose();
     _nominalCtrl.dispose();
     super.dispose();
@@ -93,8 +94,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                 debugPrint("✅ Saldo: $saldo");
 
                 setState(() {
-                  // Format saldo: hapus .00 jika bilangan bulat
-                  _saldoText = "Rp ${saldo.toStringAsFixed(0)}";
+                  // ✅ Format saldo dengan pemisah ribuan (titik)
+                  final formatRupiah = NumberFormat('#,##0', 'id_ID');
+                  _saldoText = "Rp ${formatRupiah.format(saldo)}";
                   _saldo = saldo.toDouble();
                   _isLoadingSaldo = false;
                 });
@@ -117,10 +119,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     if (userData != null && mounted) {
       setState(() {
         _userData = jsonDecode(userData);
-        _namaCtrl.text = _userData?['nama'] ?? '';
+        // Jangan auto-fill nama_penerima, biarkan user ketik sendiri
       });
 
-      // ✅ FETCH SALDO SETELAH USER DATA LOAD
       _fetchSaldo();
     }
   }
@@ -221,7 +222,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
 
       debugPrint("📤 Request URL: ${ApiConfig.penarikanStore}");
       debugPrint(
-        "📤 Request Body: ${jsonEncode({'id_masyarakat': tipeUser == 'masyarakat' ? userId : null, 'id_pns': tipeUser == 'pns' ? userId : null, 'tipe_user': tipeUser, 'nama': _namaCtrl.text, 'jenis_layanan': _selectedJenisLayanan, 'jenis_ewallet': _selectedJenisLayanan == 'bank' ? null : _selectedProvider, 'nama_bank': _selectedJenisLayanan == 'bank' ? _selectedProvider : null, 'nomor_ewallet': _nomorRekeningCtrl.text, 'jumlah_uang': jumlahUang})}",
+        "📤 Request Body: ${jsonEncode({'id_masyarakat': tipeUser == 'masyarakat' ? userId : null, 'id_pns': tipeUser == 'pns' ? userId : null, 'tipe_user': tipeUser, 'nama_pene': _namaPenerimaCtrl.text, 'jenis_layanan': _selectedJenisLayanan, 'jenis_ewallet': _selectedJenisLayanan == 'bank' ? null : _selectedProvider, 'nama_bank': _selectedJenisLayanan == 'bank' ? _selectedProvider : null, 'nomor_ewallet': _nomorRekeningCtrl.text, 'jumlah_uang': jumlahUang})}",
       );
 
       final response = await http
@@ -232,7 +233,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
               'id_masyarakat': tipeUser == 'masyarakat' ? userId : null,
               'id_pns': tipeUser == 'pns' ? userId : null,
               'tipe_user': tipeUser,
-              'nama': _namaCtrl.text,
+              'nama_penerima': _namaPenerimaCtrl.text, // GANTI DENGAN INI
               'jenis_layanan': _selectedJenisLayanan ?? 'e-wallet',
               'jenis_ewallet': _selectedJenisLayanan == 'bank'
                   ? null
@@ -262,7 +263,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
               final penarikanData = {
                 'id_penarikan': result['data']?['id'],
                 'id': result['data']?['id'],
-                'nama': _namaCtrl.text,
+                'nama_penerima': _namaPenerimaCtrl.text,
                 'jenis_layanan': _selectedJenisLayanan,
                 'jenis_ewallet': _selectedJenisLayanan == 'bank'
                     ? null
@@ -291,45 +292,126 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
 
               showDialog(
                 context: context,
-                builder: (context) => AlertDialog(
+                barrierDismissible: false,
+                builder: (context) => Dialog(
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  title: Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        color: Color(0xFF2E7D32),
-                        size: 28,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Berhasil!',
-                        style: TextStyle(color: Color(0xFF1B5E20)),
-                      ),
-                    ],
-                  ),
-                  content: Text(
-                    'Pengajuan penarikan berhasil diajukan.\n\n'
-                    '💰 Saldo Anda telah dikurangi\n'
-                    '⏰ Dana akan ditransfer dalam 1-3 hari kerja\n'
-                    '📱 Cek status di Riwayat Penarikan',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.pop(context);
-                      },
-                      child: Text(
-                        'OK',
-                        style: TextStyle(
-                          color: Color(0xFF4CAF50),
-                          fontWeight: FontWeight.bold,
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // ✅ Icon Sukses dengan Background
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color(0xFF4CAF50).withOpacity(0.3),
+                                blurRadius: 12,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 48,
+                          ),
                         ),
-                      ),
+
+                        const SizedBox(height: 24),
+
+                        // ✅ Judul
+                        Text(
+                          'Pengajuan Berhasil!',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // ✅ Subtitle
+                        Text(
+                          'Penarikan dana Anda sedang diproses',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // ✅ Info Cards
+                        _buildInfoCard(
+                          icon: Icons.account_balance_wallet_rounded,
+                          title: 'Saldo Dikurangi',
+                          subtitle:
+                              'Saldo Anda telah dikurangi secara otomatis',
+                          iconColor: Color(0xFF2196F3),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _buildInfoCard(
+                          icon: Icons.access_time_rounded,
+                          title: 'Estimasi Transfer',
+                          subtitle: '1-3 hari kerja',
+                          iconColor: Color(0xFFFF9800),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _buildInfoCard(
+                          icon: Icons.history_rounded,
+                          title: 'Cek Status',
+                          subtitle: 'Pantau status di menu Riwayat Penarikan',
+                          iconColor: Color(0xFF9C27B0),
+                        ),
+
+                        const SizedBox(height: 28),
+
+                        // ✅ Tombol OK
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF4CAF50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              'Mengerti',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               );
             } else {
@@ -387,9 +469,28 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
       appBar: AppBar(
         backgroundColor: Color(0xFF4CAF50),
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+        leading: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => Navigator.pop(context),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                ),
+                child: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
+          ),
         ),
         title: Text(
           'Pengajuan Penarikan',
@@ -397,7 +498,6 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            fontFamily: 'Montserrat',
           ),
         ),
       ),
@@ -442,8 +542,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                 ),
               ),
 
-              // ✅ SALDO CARD - Tampilkan saldo aktual
-              // ✅ SALDO CARD - dengan loading state
+              // SALDO CARD - Tampilkan saldo aktual
               Container(
                 margin: EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                 padding: EdgeInsets.all(16),
@@ -522,225 +621,252 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Nama Lengkap'),
-                          SizedBox(height: 8),
-                          TextFormField(
-                            controller: _namaCtrl,
-                            decoration: InputDecoration(
-                              hintText: 'Masukkan nama lengkap anda',
-                              hintStyle: TextStyle(color: Colors.grey[400]),
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey.shade300,
+                          // ===== DATA PRIBADI =====
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF2E7D32),
+                                      Color(0xFF4CAF50),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFF4CAF50,
+                                      ).withOpacity(0.3),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.person_outline_rounded,
+                                  color: Colors.white,
+                                  size: 16,
                                 ),
                               ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey.shade300,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Data Pribadi',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1B5E20),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Informasi penerima penarikan',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Color(0xFF4CAF50),
-                                  width: 2,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                            ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          _buildInputField(
+                            controller: _namaPenerimaCtrl, // GANTI CONTROLLER
+                            label: 'Nama Penerima', // GANTI LABEL
+                            hint: 'Masukkan nama penerima', // GANTI HINT
+                            prefixIcon: Icons.person_outline_rounded,
                             validator: (value) => value == null || value.isEmpty
-                                ? 'Nama lengkap wajib diisi'
+                                ? 'Nama penerima wajib diisi'
                                 : null,
                           ),
-                          SizedBox(height: 20),
-                          // Dropdown 1: Pilih Jenis Layanan
-                          _buildLabel('Jenis Layanan'),
-                          SizedBox(height: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade300),
-                            ),
-                            child: DropdownButtonFormField<String>(
-                              value: _selectedJenisLayanan,
-                              decoration: InputDecoration(
-                                hintText: 'Pilih Jenis Layanan',
-                                hintStyle: TextStyle(color: Colors.grey[400]),
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 14,
-                                ),
-                              ),
-                              items: _jenisLayananOptions.map((String jenis) {
-                                return DropdownMenuItem<String>(
-                                  value: jenis.toLowerCase().contains('bank')
-                                      ? 'bank'
-                                      : 'e-wallet',
-                                  child: Text(jenis),
-                                );
-                              }).toList(),
-                              onChanged: (String? newValue) {
+                          const SizedBox(height: 8),
+
+                          const SizedBox(height: 8),
+                          _buildDropdownField(
+                            label: 'Jenis Layanan',
+                            hint: 'Pilih jenis layanan',
+                            prefixIcon: Icons.category_rounded,
+                            value: _selectedJenisLayanan,
+                            items: _jenisLayananOptions.map((jenis) {
+                              return DropdownMenuItem<String>(
+                                value: jenis.toLowerCase().contains('bank')
+                                    ? 'bank'
+                                    : 'e-wallet',
+                                child: Text(jenis),
+                              );
+                            }).toList(),
+                            onChanged: (newValue) {
+                              setState(() {
+                                _selectedJenisLayanan = newValue;
+                                _selectedProvider = null;
+                              });
+                            },
+                            validator: (value) => value == null || value.isEmpty
+                                ? 'Jenis layanan wajib dipilih'
+                                : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          if (_selectedJenisLayanan != null) ...[
+                            _buildDropdownField(
+                              label: _selectedJenisLayanan == 'bank'
+                                  ? 'Pilih Bank'
+                                  : 'Pilih E-Wallet',
+                              hint: _selectedJenisLayanan == 'bank'
+                                  ? 'Pilih Bank'
+                                  : 'Pilih E-Wallet',
+                              prefixIcon: _selectedJenisLayanan == 'bank'
+                                  ? Icons.account_balance_rounded
+                                  : Icons.account_balance_wallet_rounded,
+                              value: _selectedProvider,
+                              items:
+                                  (_selectedJenisLayanan == 'bank'
+                                          ? _bankOptions
+                                          : _eWalletOptions)
+                                      .map((provider) {
+                                        return DropdownMenuItem<String>(
+                                          value: provider,
+                                          child: Text(provider),
+                                        );
+                                      })
+                                      .toList(),
+                              onChanged: (newValue) {
                                 setState(() {
-                                  _selectedJenisLayanan = newValue;
-                                  _selectedProvider =
-                                      null; // Reset provider saat ganti jenis
+                                  _selectedProvider = newValue;
                                 });
                               },
                               validator: (value) =>
                                   value == null || value.isEmpty
-                                  ? 'Jenis layanan wajib dipilih'
+                                  ? (_selectedJenisLayanan == 'bank'
+                                        ? 'Bank wajib dipilih'
+                                        : 'E-Wallet wajib dipilih')
                                   : null,
                             ),
-                          ),
-                          SizedBox(height: 20),
-
-                          // Dropdown 2: Pilih Provider (E-Wallet atau Bank)
-                          if (_selectedJenisLayanan != null) ...[
-                            _buildLabel(
-                              _selectedJenisLayanan == 'bank'
-                                  ? 'Pilih Bank'
-                                  : 'Pilih E-Wallet',
-                            ),
-                            SizedBox(height: 8),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedProvider,
-                                decoration: InputDecoration(
-                                  hintText: _selectedJenisLayanan == 'bank'
-                                      ? 'Pilih Bank'
-                                      : 'Pilih E-Wallet',
-                                  hintStyle: TextStyle(color: Colors.grey[400]),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
-                                ),
-                                items:
-                                    (_selectedJenisLayanan == 'bank'
-                                            ? _bankOptions
-                                            : _eWalletOptions)
-                                        .map((String provider) {
-                                          return DropdownMenuItem<String>(
-                                            value: provider,
-                                            child: Text(provider),
-                                          );
-                                        })
-                                        .toList(),
-                                onChanged: (String? newValue) {
-                                  setState(() {
-                                    _selectedProvider = newValue;
-                                  });
-                                },
-                                validator: (value) =>
-                                    value == null || value.isEmpty
-                                    ? (_selectedJenisLayanan == 'bank'
-                                          ? 'Bank wajib dipilih'
-                                          : 'E-Wallet wajib dipilih')
-                                    : null,
-                              ),
-                            ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 16),
                           ],
-                          _buildLabel(
-                            _selectedJenisLayanan == 'bank'
+
+                          _buildInputField(
+                            controller: _nomorRekeningCtrl,
+                            label: _selectedJenisLayanan == 'bank'
                                 ? 'Nomor Rekening'
                                 : 'Nomor E-Wallet',
-                          ),
-                          SizedBox(height: 8),
-                          TextFormField(
-                            controller: _nomorRekeningCtrl,
+                            hint: _selectedJenisLayanan == 'bank'
+                                ? 'Contoh: 1234567890'
+                                : 'Contoh: 081234567890',
+                            prefixIcon: _selectedJenisLayanan == 'bank'
+                                ? Icons.credit_card_rounded
+                                : Icons.phone_android_rounded,
                             keyboardType: TextInputType.phone,
-                            decoration: InputDecoration(
-                              hintText: _selectedJenisLayanan == 'bank'
-                                  ? 'Contoh: 1234567890'
-                                  : 'Contoh: 081234567890',
-                              hintStyle: TextStyle(color: Colors.grey[400]),
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey.shade300,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey.shade300,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Color(0xFF4CAF50),
-                                  width: 2,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                            ),
                             validator: _selectedJenisLayanan == 'bank'
                                 ? _validateNomorRekening
                                 : _validateEWalletNumber,
                           ),
-                          SizedBox(height: 20),
-                          _buildLabel('Nominal Penarikan'),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 16),
+
+                          // ===== NOMINAL PENARIKAN =====
+                          Text(
+                            'Nominal Penarikan',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1B5E20),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          const SizedBox(height: 1),
                           TextFormField(
                             controller: _nominalCtrl,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              _RupiahFormatter(),
+                            ],
                             decoration: InputDecoration(
-                              hintText: 'Minimal Rp. 50.000',
-                              hintStyle: TextStyle(color: Colors.grey[400]),
+                              labelText: 'Nominal',
+                              labelStyle: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF1B5E20),
+                                fontWeight: FontWeight.w600,
+                              ),
+                              hintText: 'Minimal Rp 50.000',
+                              hintStyle: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 13,
+                              ),
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: const Color(0xFFF9FBF9),
+                              prefixIcon: Container(
+                                margin: const EdgeInsets.only(
+                                  left: 12,
+                                  right: 4,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE8F5E9),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.attach_money_rounded,
+                                      size: 16,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                    SizedBox(width: 2),
+                                    Text(
+                                      'Rp',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF2E7D32),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 0,
+                                minHeight: 0,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                  color: Colors.grey.shade300,
+                                  color: Colors.grey.shade200,
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                  color: Colors.grey.shade300,
+                                  color: Colors.grey.shade200,
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
+                                borderSide: const BorderSide(
                                   color: Color(0xFF4CAF50),
                                   width: 2,
                                 ),
                               ),
-                              contentPadding: EdgeInsets.symmetric(
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Colors.red,
+                                  width: 1,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 14,
                               ),
@@ -754,44 +880,50 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                                   ) ??
                                   0;
                               if (nominal < 50000)
-                                return 'Minimal penarikan Rp. 50.000';
+                                return 'Minimal penarikan Rp 50.000';
                               return null;
                             },
                           ),
-                          SizedBox(height: 32),
+                          const SizedBox(height: 16),
+
+                          // ===== TOMBOL SUBMIT =====
                           SizedBox(
                             width: double.infinity,
-                            height: 52,
+                            height: 54,
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _submitWithdrawal,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF2E7D32),
+                                backgroundColor: const Color(0xFF2E7D32),
+                                disabledBackgroundColor: Colors.grey[400],
                                 foregroundColor: Colors.white,
-                                elevation: 0,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
+                                elevation: 0,
+                                shadowColor: const Color(
+                                  0xFF2E7D32,
+                                ).withOpacity(0.4),
                               ),
                               child: _isLoading
-                                  ? SizedBox(
-                                      height: 24,
-                                      width: 24,
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
                                       child: CircularProgressIndicator(
                                         color: Colors.white,
-                                        strokeWidth: 2,
+                                        strokeWidth: 2.5,
                                       ),
                                     )
-                                  : Text(
-                                      'Kirim',
+                                  : const Text(
+                                      'Ajukan Penarikan',
                                       style: TextStyle(
-                                        fontSize: 18,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
-                                        fontFamily: 'Montserrat',
+                                        letterSpacing: 0.3,
                                       ),
                                     ),
                             ),
                           ),
-                          SizedBox(height: 20),
+                          const SizedBox(height: 20),
                         ],
                       ),
                     ),
@@ -805,15 +937,279 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: Color(0xFF1B5E20),
-        fontFamily: 'Montserrat',
+  // ===== SECTION HEADER =====
+  Widget _buildSectionHeader({
+    required String number,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+            ),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4CAF50).withOpacity(0.3),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B5E20),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===== INPUT FIELD =====
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData prefixIcon,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF1B5E20),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+            filled: true,
+            fillColor: const Color(0xFFF9FBF9),
+            prefixIcon: Icon(
+              prefixIcon,
+              color: const Color(0xFF4CAF50),
+              size: 20,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+          ),
+          validator: validator,
+        ),
+      ],
+    );
+  }
+
+  // ===== DROPDOWN FIELD =====
+  Widget _buildDropdownField({
+    required String label,
+    required String hint,
+    required IconData prefixIcon,
+    required String? value,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+    required String? Function(String?) validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF1B5E20),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: value,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+            filled: true,
+            fillColor: const Color(0xFFF9FBF9),
+            prefixIcon: Icon(
+              prefixIcon,
+              color: const Color(0xFF4CAF50),
+              size: 20,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+          ),
+          items: items,
+          onChanged: onChanged,
+          validator: validator,
+          dropdownColor: Colors.white,
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Color(0xFF4CAF50),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===== INFO CARD HELPER (UNTUK NOTIFIKASI SUKSES) =====
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color iconColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
       ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1B5E20),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// CLASS: Formatter untuk format Rupiah dengan titik
+class _RupiahFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Ambil hanya angka
+    String newText = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+
+    if (newText.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    // Format dengan titik sebagai pemisah ribuan
+    String formattedText = '';
+    int counter = 0;
+
+    for (int i = newText.length - 1; i >= 0; i--) {
+      formattedText = newText[i] + formattedText;
+      counter++;
+      if (counter % 3 == 0 && i != 0) {
+        formattedText = '.$formattedText';
+      }
+    }
+
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
     );
   }
 }

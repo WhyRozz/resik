@@ -33,6 +33,23 @@ class ApiConfig {
   // ==================== 👤 PROFILE & USER ====================
   static String get profile => '$baseUrl/profile';
   static String get profileUpdate => '$baseUrl/profile';
+
+  /// FOTO
+  static String get updateFoto => '$baseUrl/profile';
+
+  /// EMAIL
+  static String get sendEmailOtp => '$baseUrl/send-email-otp';
+  static String get sendPasswordOtp => '$baseUrl/send-password-otp';
+  static String get verifyEmailOtp => '$baseUrl/verify-email-otp';
+  static String get updateEmail => '$baseUrl/update-email';
+
+  /// PASSWORD
+  static String get updatePassword => '$baseUrl/update-password';
+
+  /// FCM
+  static String get saveFcmToken => '$baseUrl/save-fcm-token';
+
+  /// SALDO
   static String get getSaldo => '$baseUrl/get-saldo';
   static String get totalSetoran => '$baseUrl/user/total-setoran';
 
@@ -58,9 +75,11 @@ class ApiConfig {
 
   // ==================== 📋 RIWAYAT ====================
   static String get riwayatSetorIndex => '$baseUrl/riwayat-setor';
-  static String get penjemputanStore => '$baseUrl/penjemputan';
-  static String get riwayatPenjemputan => '$baseUrl/riwayat-penjemputan';
-  static String get riwayatSetorPetugas => '$baseUrl/riwayat-setor-petugas';
+  static String get penjemputanStore => '$baseUrl/penjemputan/store';
+  static String riwayatPenjemputan(int adminId) =>
+      '$baseUrl/riwayat-penjemputan/$adminId';
+  static String riwayatSetorPetugas(int idPetugas) =>
+      '$baseUrl/riwayat-setor-admin/$idPetugas';
 
   // ==================== 📍 INFO TPS ====================
   static String get infoTps => '$baseUrl/tps';

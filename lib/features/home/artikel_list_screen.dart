@@ -12,15 +12,34 @@ class ArtikelListScreen extends StatefulWidget {
   State<ArtikelListScreen> createState() => _ArtikelListScreenState();
 }
 
-class _ArtikelListScreenState extends State<ArtikelListScreen> {
+class _ArtikelListScreenState extends State<ArtikelListScreen>
+    with SingleTickerProviderStateMixin {
   List<dynamic> _artikelList = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  String? _errorMessage;
+
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    );
     _fetchArtikel();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
   }
 
   Future<void> _handleRefresh() async {
@@ -28,32 +47,55 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
   }
 
   Future<void> _fetchArtikel() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
       final response = await http
           .get(Uri.parse(ApiConfig.artikel))
           .timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body);
-        if (result['status'] == 'success' && mounted) {
+      if (mounted) {
+        if (response.statusCode == 200) {
+          final result = jsonDecode(response.body);
+          if (result['status'] == 'success') {
+            setState(() {
+              _artikelList = result['data'] ?? [];
+              _isLoading = false;
+            });
+            _fadeController.forward();
+          } else {
+            setState(() {
+              _errorMessage = result['message'] ?? 'Gagal memuat data';
+              _isLoading = false;
+            });
+          }
+        } else {
           setState(() {
-            _artikelList = result['data'] ?? [];
+            _errorMessage = 'Server error: ${response.statusCode}';
             _isLoading = false;
           });
         }
       }
     } catch (e) {
-      debugPrint("Error fetch artikel: $e");
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Koneksi error: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
   List<dynamic> get _filteredArtikel {
     if (_searchQuery.isEmpty) return _artikelList;
     return _artikelList.where((artikel) {
-      final judul = artikel['judul']?.toLowerCase() ?? '';
-      return judul.contains(_searchQuery.toLowerCase());
+      final judul = artikel['judul']?.toString().toLowerCase() ?? '';
+      final kategori = artikel['kategori']?.toString().toLowerCase() ?? '';
+      return judul.contains(_searchQuery.toLowerCase()) ||
+          kategori.contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
@@ -61,129 +103,206 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF4CAF50),
-        elevation: 0,
-        leading: Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new,
-              color: Colors.white,
-              size: 16,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Icon(Icons.newspaper, color: Colors.white, size: 16),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'Artikel Edukasi',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-              ),
-            ),
-          ],
-        ),
-        centerTitle: false,
-      ),
       body: Column(
         children: [
-          // ✅ SEARCH BAR
+          // ============ CUSTOM APPBAR ============
           Container(
-            padding: const EdgeInsets.all(12),
-            color: Colors.white,
-            child: TextField(
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Cari artikel...',
-                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: Colors.grey.shade600,
-                  size: 20,
-                ),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18),
-                        onPressed: () => setState(() => _searchQuery = ''),
-                      )
-                    : null,
-                filled: true,
-                fillColor: const Color(0xFFF5F5F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 20),
+                child: Row(
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.menu_book_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Artikel Edukasi',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Tips & informasi',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
 
-          // ✅ LIST ARTIKEL
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _handleRefresh,
-              color: const Color(0xFF4CAF50),
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF4CAF50),
-                      ),
-                    )
-                  : _filteredArtikel.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.article_outlined,
-                            size: 60,
-                            color: Colors.grey.shade300,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _searchQuery.isEmpty
-                                ? 'Belum ada artikel'
-                                : 'Artikel tidak ditemukan',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _filteredArtikel.length,
-                      itemBuilder: (context, index) {
-                        final artikel = _filteredArtikel[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _buildArtikelCard(artikel),
-                        );
-                      },
-                    ),
+          // ============ CONTENT ============
+          Expanded(child: _buildContent()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_isLoading) {
+      return _buildSkeletonLoading();
+    }
+
+    if (_errorMessage != null) {
+      return _buildErrorState();
+    }
+
+    if (_artikelList.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    // Determine apakah tampilkan featured
+    final showFeatured = _searchQuery.isEmpty && _filteredArtikel.isNotEmpty;
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        color: const Color(0xFF4CAF50),
+        backgroundColor: Colors.white,
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 20),
+          itemCount: _buildListItemCount(showFeatured),
+          itemBuilder: (context, index) {
+            return _buildListItem(index, showFeatured);
+          },
+        ),
+      ),
+    );
+  }
+
+  int _buildListItemCount(bool showFeatured) {
+    int count = 0;
+    count += 1; // Search bar
+    if (showFeatured) count += 1; // Featured
+    count += 1; // Section title
+    count += _filteredArtikel.length; // All articles
+    return count;
+  }
+
+  Widget _buildListItem(int index, bool showFeatured) {
+    int current = 0;
+
+    // Search Bar
+    if (index == current) return _buildSearchBar();
+    current++;
+
+    // Featured
+    if (showFeatured) {
+      if (index == current) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: _buildFeaturedArtikel(_filteredArtikel.first),
+        );
+      }
+      current++;
+    }
+
+    // Section Title
+    if (index == current) return _buildSectionTitle();
+    current++;
+
+    // Articles
+    final articleIndex = index - current;
+    if (articleIndex < _filteredArtikel.length) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: _buildArtikelCard(_filteredArtikel[articleIndex], articleIndex),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  // ===== SKELETON LOADING =====
+  Widget _buildSkeletonLoading() {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          ...List.generate(
+            4,
+            (index) => Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
         ],
@@ -191,27 +310,122 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
     );
   }
 
-  // ✅ FEATURED ARTICLE (Artikel Pertama - Lebih Besar)
+  // ===== SEARCH BAR =====
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search_rounded, color: Colors.grey[400], size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Cari artikel atau kategori...',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          if (_searchQuery.isNotEmpty)
+            IconButton(
+              onPressed: () => setState(() => _searchQuery = ''),
+              icon: Icon(Icons.close, color: Colors.grey[400], size: 18),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ===== SECTION TITLE =====
+  Widget _buildSectionTitle() {
+    final totalArtikel = _filteredArtikel.length;
+    final hasFeatured = _searchQuery.isEmpty && _artikelList.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.article_rounded,
+              color: Colors.white,
+              size: 14,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _searchQuery.isEmpty
+                      ? (hasFeatured ? 'Artikel Lainnya' : 'Semua Artikel')
+                      : 'Hasil Pencarian',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1B5E20),
+                  ),
+                ),
+                Text(
+                  '$totalArtikel artikel, Yuk baca artikel edukasi sekarang!',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===== FEATURED ARTICLE =====
   Widget _buildFeaturedArtikel(Map<String, dynamic> artikel) {
     return GestureDetector(
       onTap: () => _navigateToDetail(artikel),
       child: Container(
-        height: 200,
+        height: 220,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4CAF50).withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
+              color: const Color(0xFF4CAF50).withOpacity(0.2),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: Stack(
           fit: StackFit.expand,
           children: [
+            // Background Image
             ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
               child: Image.network(
                 ApiConfig.imageUrl(artikel['foto']),
                 fit: BoxFit.cover,
@@ -225,16 +439,17 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
                 ),
               ),
             ),
+            // Gradient Overlay
             Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
                     Colors.black.withOpacity(0.3),
-                    Colors.black.withOpacity(0.8),
+                    Colors.black.withOpacity(0.85),
                   ],
                   stops: const [0.0, 0.5, 1.0],
                 ),
@@ -242,119 +457,137 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
             ),
             // Featured Badge
             Positioned(
-              top: 10,
-              left: 10,
+              top: 12,
+              left: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
-                  vertical: 4,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFB347),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFB347), Color(0xFFFF9500)],
+                  ),
                   borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF9500).withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.star_rounded, color: Colors.white, size: 11),
+                    Icon(Icons.star_rounded, color: Colors.white, size: 12),
                     SizedBox(width: 4),
                     Text(
-                      'FEATURED',
+                      'Terbaru',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 9,
+                        fontSize: 10,
                         fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+            // Kategori Badge
+            if (artikel['kategori'] != null &&
+                artikel['kategori'].toString().isNotEmpty)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getKategoriColor(
+                      artikel['kategori'],
+                    ).withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    artikel['kategori'].toString().toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
             // Content
             Positioned(
-              left: 12,
-              right: 12,
-              bottom: 12,
+              left: 16,
+              right: 16,
+              bottom: 16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (artikel['kategori'] != null &&
-                      artikel['kategori'].toString().isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        artikel['kategori'].toString().toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
                   Text(
                     artikel['judul'] ?? '',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.w800,
                       height: 1.3,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.calendar_month_rounded,
-                        color: Colors.white70,
-                        size: 12,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDate(artikel['tanggal']),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.calendar_month_rounded,
+                              color: Colors.white,
+                              size: 11,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatDate(artikel['tanggal']),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      const Icon(
-                        Icons.access_time_rounded,
-                        color: Colors.white70,
-                        size: 12,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _estimateReadingTime(
-                          artikel['konten'] ?? artikel['judul'] ?? '',
-                        ),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      const SizedBox(width: 8),
+
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
                           Icons.arrow_forward_rounded,
                           color: Color(0xFF4CAF50),
-                          size: 12,
+                          size: 14,
                         ),
                       ),
                     ],
@@ -368,163 +601,135 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
     );
   }
 
-  // ✅ ARTICLE CARD - COMPACT
-  Widget _buildArtikelCard(Map<String, dynamic> artikel) {
+  // ===== ARTICLE CARD (HORIZONTAL LAYOUT) =====
+  Widget _buildArtikelCard(Map<String, dynamic> artikel, int index) {
     return GestureDetector(
       onTap: () => _navigateToDetail(artikel),
       child: Container(
+        height: 110,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    topRight: Radius.circular(12),
-                  ),
-                  child: Image.network(
-                    ApiConfig.imageUrl(artikel['foto']),
-                    width: double.infinity,
-                    height: 100,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 100,
-                      color: Colors.grey.shade200,
-                      child: const Icon(
-                        Icons.image_outlined,
-                        size: 35,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                ),
-                if (artikel['kategori'] != null &&
-                    artikel['kategori'].toString().isNotEmpty)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getKategoriColor(
-                          artikel['kategori'],
-                        ).withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        artikel['kategori'].toString().toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
+            // Image
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+              ),
+              child: SizedBox(
+                width: 120,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.network(
+                      ApiConfig.imageUrl(artikel['foto']),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey.shade200,
+                        child: const Icon(
+                          Icons.image_outlined,
+                          size: 30,
+                          color: Colors.grey,
                         ),
                       ),
                     ),
-                  ),
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.access_time_rounded,
-                          color: Colors.white,
-                          size: 10,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          _estimateReadingTime(
-                            artikel['konten'] ?? artikel['judul'] ?? '',
+                    if (artikel['kategori'] != null &&
+                        artikel['kategori'].toString().isNotEmpty)
+                      Positioned(
+                        top: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
                           ),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          decoration: BoxDecoration(
+                            color: _getKategoriColor(
+                              artikel['kategori'],
+                            ).withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            artikel['kategori'].toString().toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 7,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      artikel['judul'] ?? '',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1B5E20),
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 10,
+                          color: Colors.grey[500],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDate(artikel['tanggal']),
+                          style: TextStyle(
                             fontSize: 9,
-                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    artikel['judul'] ?? '',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1B5E20),
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF3E5F5),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: const Icon(
-                          Icons.calendar_month_rounded,
-                          color: Color(0xFF7B1FA2),
-                          size: 10,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          _formatDate(artikel['tanggal']),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Container(
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
+                          horizontal: 10,
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+                            colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
                           ),
                           borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF4CAF50).withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
@@ -546,13 +751,128 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ===== EMPTY STATE =====
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF4CAF50).withOpacity(0.1),
+                  const Color(0xFF81C784).withOpacity(0.1),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.menu_book_rounded,
+              size: 60,
+              color: Color(0xFF4CAF50),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Belum Ada Artikel',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1B5E20),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _searchQuery.isEmpty
+                ? 'Artikel akan muncul setelah\nadmin menambahkannya'
+                : 'Coba kata kunci lain',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[500],
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _fetchArtikel,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Refresh'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===== ERROR STATE =====
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Colors.red.shade400,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _fetchArtikel,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Coba Lagi'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -588,8 +908,9 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
 
   String _formatDate(dynamic dateString) {
     if (dateString == null || dateString.toString().isEmpty) return '-';
-    final dateStr = dateString.toString();
+    final dateStr = dateString.toString().trim();
 
+    // ✅ Kalau sudah format "13 Juli 2026", langsung return
     if (RegExp(
       r'^\d{1,2}\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4}$',
     ).hasMatch(dateStr)) {
@@ -597,26 +918,40 @@ class _ArtikelListScreenState extends State<ArtikelListScreen> {
     }
 
     try {
-      DateTime date;
-      if (dateStr.contains(' ') || dateStr.contains('T')) {
-        date = DateTime.parse(dateStr);
-      } else if (dateStr.contains('-')) {
+      DateTime? date;
+
+      // ✅ CEK 1: Format ISO "2026-07-13" atau "2026-07-13 23:41:00"
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(dateStr)) {
+        date = DateTime.parse(dateStr.split(' ')[0]);
+      }
+      // ✅ CEK 2: Format "13-07-2026" (DD-MM-YYYY)
+      else if (RegExp(r'^\d{2}-\d{2}-\d{4}$').hasMatch(dateStr)) {
         final parts = dateStr.split('-');
-        if (parts.length == 3) {
-          date = DateTime(
-            int.parse(parts[0]),
-            int.parse(parts[1]),
-            int.parse(parts[2]),
-          );
-        } else {
-          return dateStr;
-        }
-      } else if (int.tryParse(dateStr) != null) {
-        date = DateTime.fromMillisecondsSinceEpoch(int.parse(dateStr));
-      } else {
+        date = DateTime(
+          int.parse(parts[2]), // tahun
+          int.parse(parts[1]), // bulan
+          int.parse(parts[0]), // tanggal
+        );
+      }
+      // ✅ CEK 3: Format "2026/07/13"
+      else if (RegExp(r'^\d{4}/\d{2}/\d{2}').hasMatch(dateStr)) {
+        date = DateTime.parse(dateStr.split(' ')[0].replaceAll('/', '-'));
+      }
+      // ✅ CEK 4: Format "13/07/2026"
+      else if (RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dateStr)) {
+        final parts = dateStr.split('/');
+        date = DateTime(
+          int.parse(parts[2]),
+          int.parse(parts[1]),
+          int.parse(parts[0]),
+        );
+      }
+      // ❌ Format tidak dikenali
+      else {
         return dateStr;
       }
 
+      // ✅ FORMAT OUTPUT: "13 Juli 2026"
       final months = [
         'Januari',
         'Februari',

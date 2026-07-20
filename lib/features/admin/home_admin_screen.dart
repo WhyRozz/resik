@@ -11,6 +11,7 @@ import '../shared/jenis_sampah_list_screen.dart';
 import 'riwayat_setor_admin_screen.dart';
 import 'riwayat_penjemputan_admin_screen.dart';
 import '../auth/login/login_screen.dart';
+import 'notification_list_screen_admin.dart';
 
 import 'package:provider/provider.dart';
 import '../../providers/statistik_provider.dart';
@@ -30,6 +31,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
   bool _isLoadingArtikel = true;
   Map<String, dynamic> _statsData = {};
   bool _isLoadingStats = true;
+  int _notificationCount = 0;
 
   @override
   void initState() {
@@ -43,11 +45,24 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     });
   }
 
+  // HANDLE REFRESH (PULL TO REFRESH)
+  Future<void> _handleRefresh() async {
+    await Future.wait([
+      _fetchArtikel(),
+      _fetchStatistik(),
+      _fetchNotificationCount(),
+      context.read<StatistikProvider>().fetchStatistik(),
+    ]);
+  }
+
   Future<void> _loadAdminData() async {
     final prefs = await SharedPreferences.getInstance();
     final userData = prefs.getString('user_data');
     if (userData != null && mounted) {
       setState(() => _adminData = jsonDecode(userData));
+
+      // Fetch badge SETELAH _adminData terisi
+      _fetchNotificationCount();
     }
   }
 
@@ -98,41 +113,172 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     }
   }
 
-  // ✅ LOGOUT FUNCTION
+  Future<void> _fetchNotificationCount() async {
+    if (_adminData == null) {
+      debugPrint("⚠️ _fetchNotificationCount: _adminData masih null!");
+      return;
+    }
+
+    try {
+      final userId = _adminData!['id_petugas'].toString();
+      final uri = Uri.parse(
+        ApiConfig.baseUrl + '/notifications/unread-count',
+      ).replace(queryParameters: {'user_id': userId, 'tipe': 'petugas'});
+
+      debugPrint('🔔 Fetching notif count... userId=$userId');
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+
+      debugPrint('📥 Status: ${response.statusCode}');
+      debugPrint('📄 Response: ${response.body}');
+
+      if (response.statusCode == 200 && mounted) {
+        final result = jsonDecode(response.body);
+        if (result['status'] == 'success') {
+          final count = result['data']['unread_count'] ?? 0;
+          debugPrint('✅ Unread count: $count');
+          setState(() {
+            _notificationCount = count;
+          });
+        } else {
+          debugPrint('❌ Status bukan success: ${result['status']}');
+        }
+      } else {
+        debugPrint('❌ HTTP error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error notif count: $e');
+    }
+  }
+
+  // LOGOUT FUNCTION
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Keluar?'),
-        content: const Text('Anda akan keluar dari akun admin.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        elevation: 8,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon Container dengan Gradient
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF5252), Color(0xFFFF1744)],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF5252).withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.logout_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Title
+              const Text(
+                'Keluar dari Akun?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A1A),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              // Description
+              Text(
+                'Apakah Anda yakin ingin keluar dari sesi petugas?',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+
+              // Buttons
+              Row(
+                children: [
+                  // Tombol Batal
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF4CAF50),
+                        side: const BorderSide(
+                          color: Color(0xFF4CAF50),
+                          width: 1.5,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Tombol Keluar
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF5252),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                        shadowColor: const Color(0xFFFF5252).withOpacity(0.4),
+                      ),
+                      child: const Text(
+                        'Keluar',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red, // Background tombol merah
-              foregroundColor: Colors
-                  .white, // ✅ Teks tombol putih (pindah ke dalam styleFrom)
-            ),
-            child: const Text('Keluar'),
-          ),
-        ],
+        ),
       ),
     );
 
     if (confirm == true && mounted) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.clear(); // Clear semua data login
+      await prefs.clear();
 
-      // Kembali ke login screen (sesuaikan dengan nama screen login kamu)
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
-        ), // ✅ Ganti dengan screen login kamu
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
     }
@@ -382,14 +528,21 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         child: Column(
           children: [
             _buildHeader(),
-            Expanded(child: _buildBody()),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _handleRefresh,
+                color: Colors.white,
+                backgroundColor: const Color(0xFF2E7D32),
+                child: _buildBody(),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ✅ HEADER - TANPA NAVIGASI PROFILE, TOMBOL LOGOUT
+  // HEADER - TANPA NAVIGASI PROFILE, TOMBOL LOGOUT
   Widget _buildHeader() {
     final nama = _adminData?['nama_lengkap'] ?? 'Admin';
     final foto = _adminData?['foto'];
@@ -414,7 +567,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Selamat Datang Petugas',
+                  'Welcome Petugas',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -429,30 +582,90 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (_adminData?['level'] != null)
+                if (_adminData?['nama_wilayah'] != null)
                   Text(
-                    _adminData!['level']
-                        .toString()
-                        .replaceAll('_', ' ')
-                        .toUpperCase(),
+                    _adminData!['nama_wilayah'].toString(),
                     style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
               ],
             ),
           ),
-          // ✅ TOMBOL LOGOUT (GANTI QR CODE)
+          const SizedBox(width: 8),
+
+          // ✅ ICON NOTIFIKASI DENGAN BADGE (POLA DARI USER SCREEN - PROVEN WORKS!)
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationListScreenAdmin(),
+                    ),
+                  ).then((_) {
+                    // ✅ Refresh badge setelah kembali dari notifikasi
+                    if (mounted) _fetchNotificationCount();
+                  });
+                },
+                borderRadius: BorderRadius.circular(30),
+                child: Padding(
+                  padding: const EdgeInsets.all(8), // ✅ Area tap lebih besar
+                  child: const Icon(
+                    Icons.notifications_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              if (_notificationCount > 0)
+                Positioned(
+                  right: 2,
+                  top: 2,
+                  child: IgnorePointer(
+                    // ✅ KUNCI! Badge tidak menghalangi klik!
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        _notificationCount > 99 ? '99+' : '$_notificationCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+
+          // TOMBOL LOGOUT
           InkWell(
             onTap: _handleLogout,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.logout, color: Colors.white, size: 28),
-                SizedBox(height: 2),
-                Text(
-                  'Keluar',
-                  style: TextStyle(color: Colors.white, fontSize: 10),
-                ),
-              ],
+            borderRadius: BorderRadius.circular(30),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.logout_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
           ),
         ],
@@ -472,7 +685,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ✅ STATISTIK SECTION (Langsung di paling atas - Clean!)
+            // STATISTIK SECTION (Langsung di paling atas - Clean!)
             _buildStatistikSection(),
             const SizedBox(height: 24),
 
@@ -516,110 +729,171 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     );
   }
 
-  // ✅ STATISTIK SECTION WIDGET
   Widget _buildStatistikSection() {
     return Consumer<StatistikProvider>(
       builder: (context, provider, child) {
         final stats = provider.statistik;
 
         if (provider.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(color: Color(0xFF2196F3)),
+            ),
+          );
         }
 
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFFE8F5E9),
+                Color(0xFFC8E6C9),
+                Color(0xFFA5D6A7),
+              ], // ← BIRU
+            ),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+                color: const Color(0xFF4CAF50).withOpacity(0.15), // ← HIJAU
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              // Header
+              Row(
                 children: [
-                  Icon(Icons.analytics, color: Color(0xFF4CAF50), size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Statistik Hari Ini',
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.date_range_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Statistik 7 Hari Terakhir',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1B5E20),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // TAMBAH: Info periode
+              if (stats['periode'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Periode: ${stats['periode']['dari']} - ${stats['periode']['sampai']}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey.shade600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+
+              // Grid 2x2
               Row(
                 children: [
                   Expanded(
-                    child: _buildStatCard(
+                    child: _buildModernStatCard(
                       '${stats['hari_ini'] ?? 0}',
                       'Transaksi',
-                      Icons.receipt,
-                      Colors.blue,
+                      Icons.receipt_long_rounded,
+                      const Color(0xFF2196F3),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildStatCard(
+                    child: _buildModernStatCard(
                       '${stats['selesai'] ?? 0}',
                       'Selesai',
-                      Icons.check_circle,
-                      Colors.green,
+                      Icons.check_circle_outline_rounded,
+                      const Color(0xFF4CAF50),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
-                    child: _buildStatCard(
+                    child: _buildModernStatCard(
                       '${stats['pending'] ?? 0}',
                       'Pending',
-                      Icons.pending,
-                      Colors.orange,
+                      Icons.access_time_rounded,
+                      const Color(0xFFFF9800),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildStatCard(
+                    child: _buildModernStatCard(
                       '${stats['dibatalkan'] ?? 0}',
                       'Dibatalkan',
-                      Icons.cancel,
-                      Colors.red,
+                      Icons.cancel_rounded,
+                      const Color(0xFFF44336),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
+
+              // Total Nominal & Berat
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.5),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildInlineStat(
-                      'Total Nominal',
-                      'Rp ${(stats['total_nominal_hari_ini'] ?? 0).toStringAsFixed(0)}',
-                      Icons.attach_money,
+                    Expanded(
+                      child: _buildTotalItem(
+                        'Total Nominal',
+                        _formatRupiah(stats['total_nominal_hari_ini'] ?? 0),
+                        Icons.attach_money_rounded,
+                        const Color(0xFF2E7D32),
+                      ),
                     ),
-                    Container(width: 1, height: 30, color: Colors.grey[300]),
-                    _buildInlineStat(
-                      'Total Berat',
-                      '${(stats['total_berat_hari_ini'] ?? 0).toStringAsFixed(1)} kg',
-                      Icons.scale,
+                    Container(
+                      width: 1,
+                      height: 30,
+                      color: Colors.grey.shade300,
+                    ),
+                    Expanded(
+                      child: _buildTotalItem(
+                        'Total Berat',
+                        '${(stats['total_berat_hari_ini'] ?? 0).toStringAsFixed(1)} kg',
+                        Icons.scale_rounded,
+                        const Color(0xFF7B1FA2),
+                      ),
                     ),
                   ],
                 ),
@@ -631,59 +905,91 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     );
   }
 
-  Widget _buildStatCard(
+  Widget _buildModernStatCard(
     String value,
     String label,
     IconData icon,
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 8),
           Text(
             value,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: color,
             ),
           ),
+          const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(fontSize: 11, color: color.withOpacity(0.8)),
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInlineStat(String label, String value, IconData icon) {
+  Widget _buildTotalItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Column(
       children: [
         Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 14, color: const Color(0xFF1B5E20)),
+            Icon(icon, size: 14, color: color),
             const SizedBox(width: 4),
             Text(
               value,
-              style: const TextStyle(
-                fontSize: 13,
+              style: TextStyle(
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1B5E20),
+                color: color,
               ),
             ),
           ],
         ),
-        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
@@ -847,4 +1153,12 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
       ),
     );
   }
+}
+
+String _formatRupiah(dynamic value) {
+  if (value == null) return 'Rp 0';
+  double angka = value is num
+      ? value.toDouble()
+      : double.tryParse(value.toString()) ?? 0;
+  return 'Rp ${angka.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
 }

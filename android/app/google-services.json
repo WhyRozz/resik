@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "603548742290",
+    "project_id": "resik-dlh-nganjuk",
+    "storage_bucket": "resik-dlh-nganjuk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:603548742290:android:eac87c51a8257afeac2c4b",
+        "android_client_info": {
+          "package_name": "com.example.resik"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcAxQiGl0fP96Fh04i8GuoX7EvAm0ODI0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

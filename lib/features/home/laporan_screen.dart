@@ -29,6 +29,7 @@ class _LaporanScreenState extends State<LaporanScreen> {
   File? _imageFile;
   final _picker = ImagePicker();
   bool _isLoading = false;
+  bool _isGettingLocation = false;
   Map<String, dynamic>? _userData;
 
   @override
@@ -66,98 +67,137 @@ class _LaporanScreenState extends State<LaporanScreen> {
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return SafeArea(
-          child: Wrap(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    const Text(
-                      'Pilih Sumber Foto',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Pilih Sumber Foto',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1B5E20),
                     ),
-                    const SizedBox(height: 16),
-                    ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Color(0xFF4CAF50),
-                        ),
-                      ),
-                      title: const Text(
-                        'Ambil Foto',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: const Text(
-                        'Gunakan kamera untuk mengambil foto',
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickImage(ImageSource.camera);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE3F2FD),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.photo_library,
-                          color: Color(0xFF2196F3),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ambil foto baru atau pilih dari galeri',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSourceOption(
+                          icon: Icons.camera_alt_rounded,
+                          label: 'Kamera',
+                          color: const Color(0xFF4CAF50),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _pickImage(ImageSource.camera);
+                          },
                         ),
                       ),
-                      title: const Text(
-                        'Pilih dari Galeri',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildSourceOption(
+                          icon: Icons.photo_library_rounded,
+                          label: 'Galeri',
+                          color: const Color(0xFF2196F3),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _pickImage(ImageSource.gallery);
+                          },
+                        ),
                       ),
-                      subtitle: const Text('Pilih foto dari galeri perangkat'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _pickImage(ImageSource.gallery);
-                      },
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
+  Widget _buildSourceOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withOpacity(0.2)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: Colors.white, size: 24),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _getCurrentLocation() async {
-    setState(() => _isLoading = true);
+    setState(() => _isGettingLocation = true);
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         _showError('Lokasi tidak aktif. Silakan aktifkan GPS.');
-        setState(() => _isLoading = false);
+        setState(() => _isGettingLocation = false);
         return;
       }
       LocationPermission permission = await Geolocator.checkPermission();
@@ -165,7 +205,7 @@ class _LaporanScreenState extends State<LaporanScreen> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           _showError('Izin lokasi ditolak');
-          setState(() => _isLoading = false);
+          setState(() => _isGettingLocation = false);
           return;
         }
       }
@@ -212,15 +252,28 @@ class _LaporanScreenState extends State<LaporanScreen> {
     } catch (e) {
       _showError('Gagal mendapatkan lokasi: $e');
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => _isGettingLocation = false);
     }
   }
 
   void _showError(String msg) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(child: Text(msg)),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
     }
   }
 
@@ -267,8 +320,6 @@ class _LaporanScreenState extends State<LaporanScreen> {
       var result = jsonDecode(response.body);
       if (mounted) {
         setState(() => _isLoading = false);
-        debugPrint('Response Status: ${response.statusCode}');
-        debugPrint('Response Body: ${response.body}');
         if (response.statusCode == 200 && result['status'] == 'success') {
           _showSuccessDialog();
         } else {
@@ -277,7 +328,6 @@ class _LaporanScreenState extends State<LaporanScreen> {
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      debugPrint('Exception: $e');
       _showError('Koneksi error: $e');
     }
   }
@@ -285,35 +335,85 @@ class _LaporanScreenState extends State<LaporanScreen> {
   void _showSuccessDialog() {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 32),
-            SizedBox(width: 8),
-            Text('Berhasil!', style: TextStyle(color: Color(0xFF1B5E20))),
-          ],
-        ),
-        content: const Text(
-          'Laporan berhasil dikirim. Menunggu verifikasi admin.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RiwayatLaporanScreen()),
-              );
-            },
-            child: const Text(
-              'OK',
-              style: TextStyle(
-                color: Color(0xFF4CAF50),
-                fontWeight: FontWeight.bold,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF4CAF50).withOpacity(0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 40,
+                ),
               ),
-            ),
+              const SizedBox(height: 20),
+              const Text(
+                'Laporan Terkirim!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B5E20),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Laporan Anda berhasil dikirim dan sedang menunggu verifikasi dari admin.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[600],
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const HomeUserScreen(), // ← KE BERANDA
+                      ),
+                      (route) => false,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Kembali ke Beranda', // ← TEKS BARU
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -327,82 +427,101 @@ class _LaporanScreenState extends State<LaporanScreen> {
     super.dispose();
   }
 
-  // ✅ HELPER WIDGETS
-  Widget _buildLabel(String text) => Text(
-    text,
-    style: const TextStyle(
-      fontSize: 13,
-      fontWeight: FontWeight.bold,
-      color: Color(0xFF1B5E20),
-    ),
-  );
+  // ============ HELPER WIDGETS ============
 
-  InputDecoration _inputDecoration(String hint, {Widget? suffix}) =>
-      InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.grey),
-        filled: true,
-        fillColor: Colors.white,
-        suffixIcon: suffix,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      );
-
-  // ✅ BUBBLE TABS (Sama seperti RiwayatLaporanScreen)
-  Widget _buildBubble(
-    String label,
-    IconData icon,
-    bool isActive,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF4CAF50) : const Color(0xFFE8F5E9),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isActive ? Colors.white : const Color(0xFF4CAF50),
+  Widget _buildSectionHeader({
+    required String number,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
             ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? Colors.white : const Color(0xFF4CAF50),
-                fontSize: 12,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4CAF50).withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: const TextStyle(
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
+                fontSize: 14,
               ),
             ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B5E20),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  // ✅ BOTTOM NAVIGATION (KONSISTEN SEMUA SCREEN)
-  Widget _buildConsistentBottomNav(BuildContext context) {
+  InputDecoration _inputDecoration({
+    required String hint,
+    Widget? prefix,
+    Widget? suffix,
+    bool filled = true,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+      filled: filled,
+      fillColor: Colors.white,
+      prefixIcon: prefix,
+      suffixIcon: suffix,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade200),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.red, width: 1),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
+  Widget _buildBottomNav(BuildContext context) {
     final items = [
       {'icon': Icons.home_outlined, 'active': Icons.home, 'label': 'Home'},
       {
@@ -423,7 +542,7 @@ class _LaporanScreenState extends State<LaporanScreen> {
     ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      height: 65,
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -437,36 +556,36 @@ class _LaporanScreenState extends State<LaporanScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: List.generate(items.length, (index) {
-          final isActive = index == 1; // Tab Laporan aktif di screen ini
+          final isActive = index == 1;
           final item = items[index];
-
           return GestureDetector(
             onTap: () {
-              if (index == 0)
-                Navigator.push(
+              if (index == 0) {
+                Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const HomeUserScreen()),
+                  (route) => false,
                 );
-              else if (index == 2)
-                Navigator.push(
+              } else if (index == 2) {
+                Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const RiwayatSetorScreen()),
+                  (route) => false,
                 );
-              else if (index == 3)
-                Navigator.push(
+              } else if (index == 3) {
+                Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const InfoTpsScreen()),
+                  (route) => false,
                 );
-              // index 1 = Laporan (screen saat ini), tidak perlu navigasi
+              }
             },
             child: Container(
-              padding: isActive
-                  ? const EdgeInsets.symmetric(horizontal: 20, vertical: 10)
-                  : const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: isActive
-                  ? BoxDecoration(
-                      color: const Color(0xFF4CAF50),
-                      borderRadius: BorderRadius.circular(30),
+                  ? const BoxDecoration(
+                      color: Color(0xFF4CAF50),
+                      borderRadius: BorderRadius.all(Radius.circular(20)),
                     )
                   : null,
               child: Row(
@@ -479,14 +598,14 @@ class _LaporanScreenState extends State<LaporanScreen> {
                     color: isActive ? Colors.white : Colors.grey,
                     size: 22,
                   ),
-                  if (isActive) const SizedBox(width: 8),
+                  if (isActive) const SizedBox(width: 6),
                   if (isActive)
                     Text(
                       item['label'] as String,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: 12,
                       ),
                     ),
                 ],
@@ -501,25 +620,96 @@ class _LaporanScreenState extends State<LaporanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF4CAF50),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const HomeUserScreen()),
-          ),
-        ),
-        title: const Text(
-          'Pengajuan Laporan',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
+      backgroundColor: const Color(0xFFF5F7FA),
       body: Column(
         children: [
-          // ✅ FORM LAPORAN (Scrollable)
+          // ============ CUSTOM APPBAR ============
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 20),
+                child: Row(
+                  children: [
+                    // Icon kembali
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // ✅ ICON WARNING DIPINDAH KE KIRI (SETELAH ICON KEMBALI)
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Text di tengah
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Laporan Baru',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Laporkan sampah ilegal di sekitarmu',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ============ FORM CONTENT ============
           Expanded(
             child: Form(
               key: _formKey,
@@ -528,7 +718,13 @@ class _LaporanScreenState extends State<LaporanScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 📸 UPLOAD FOTO
+                    // ===== SECTION 1: UPLOAD FOTO =====
+                    _buildSectionHeader(
+                      number: '1',
+                      title: 'Foto Bukti',
+                      subtitle: 'Upload foto lokasi sampah ilegal',
+                    ),
+                    const SizedBox(height: 12),
                     GestureDetector(
                       onTap: _showImageSourceDialog,
                       child: Container(
@@ -537,221 +733,369 @@ class _LaporanScreenState extends State<LaporanScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.grey.shade300,
-                            width: 1.5,
-                          ),
+                          border: _imageFile != null
+                              ? null
+                              : Border.all(
+                                  color: const Color(
+                                    0xFF4CAF50,
+                                  ).withOpacity(0.3),
+                                  width: 1.5,
+                                  strokeAlign: BorderSide.strokeAlignInside,
+                                ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        child: _imageFile != null
-                            ? Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Image.file(
-                                      _imageFile!,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.3),
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: const Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.add_a_photo,
-                                          size: 48,
-                                          color: Colors.white,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: _imageFile != null
+                              ? Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Image.file(_imageFile!, fit: BoxFit.cover),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.transparent,
+                                            Colors.black.withOpacity(0.7),
+                                          ],
                                         ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          'Klik untuk ganti foto',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 12,
+                                      left: 12,
+                                      right: 12,
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.check_circle,
+                                              color: Color(0xFF4CAF50),
+                                              size: 20,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 8),
+                                          const Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Foto berhasil diupload',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'Tap untuk ganti foto',
+                                                  style: TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(
+                                                0.2,
+                                              ),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.edit,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              )
-                            : const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(height: 12),
-                                  Icon(
-                                    Icons.add_a_photo,
-                                    size: 48,
-                                    color: Color(0xFF4CAF50),
-                                  ),
-                                  SizedBox(height: 12),
-                                  Text(
-                                    'Upload Foto Bukti',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1B5E20),
+                                  ],
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFF4CAF50,
+                                        ).withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.add_a_photo_rounded,
+                                        size: 40,
+                                        color: Color(0xFF4CAF50),
+                                      ),
                                     ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Format: JPG, PNG (Max 5MB)',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'Tap untuk upload foto',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1B5E20),
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // 📅 TANGGAL
-                    _buildLabel('Tanggal'),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _tanggalCtrl,
-                      readOnly: true,
-                      onTap: () => setState(
-                        () => _tanggalCtrl.text = DateFormat(
-                          'dd-MM-yyyy HH:mm',
-                        ).format(DateTime.now()),
-                      ),
-                      decoration: _inputDecoration('Pilih tanggal'),
-                      validator: (v) =>
-                          v!.isEmpty ? 'Tanggal wajib diisi' : null,
-                    ),
-                    const SizedBox(height: 15),
-                    // 👤 NAMA LENGKAP
-                    _buildLabel('Nama Lengkap'),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _namaCtrl,
-                      readOnly: true,
-                      decoration: _inputDecoration('Otomatis dari profil'),
-                    ),
-                    const SizedBox(height: 15),
-                    // 📍 LOKASI
-                    _buildLabel('Lokasi Foto'),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _lokasiCtrl,
-                      readOnly: true,
-                      decoration: _inputDecoration(
-                        'Klik icon lokasi',
-                        suffix: IconButton(
-                          icon: const Icon(
-                            Icons.my_location,
-                            color: Color(0xFF4CAF50),
-                          ),
-                          onPressed: _getCurrentLocation,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Format: JPG, PNG (Max 5MB)',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ),
-                      validator: (v) =>
-                          v!.isEmpty ? 'Lokasi wajib diisi' : null,
                     ),
-                    const SizedBox(height: 15),
-                    // 📝 KETERANGAN
-                    _buildLabel('Keterangan'),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _keteranganCtrl,
-                      maxLines: 3,
-                      decoration: _inputDecoration(
-                        'Deskripsi singkat kejadian',
+                    const SizedBox(height: 24),
+
+                    // ===== SECTION 2: DETAIL LAPORAN =====
+                    _buildSectionHeader(
+                      number: '2',
+                      title: 'Detail Laporan',
+                      subtitle: 'Lengkapi informasi laporan',
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
-                      validator: (v) =>
-                          v!.isEmpty ? 'Keterangan wajib diisi' : null,
+                      child: Column(
+                        children: [
+                          // Tanggal
+                          _buildFieldLabel(
+                            'Tanggal Pelaporan',
+                            Icons.calendar_today_rounded,
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _tanggalCtrl,
+                            readOnly: true,
+                            decoration: _inputDecoration(
+                              hint: 'Pilih tanggal',
+                              prefix: const Icon(
+                                Icons.event,
+                                color: Color(0xFF4CAF50),
+                                size: 20,
+                              ),
+                            ),
+                            validator: (v) =>
+                                v!.isEmpty ? 'Tanggal wajib diisi' : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Nama
+                          _buildFieldLabel(
+                            'Nama Pelapor',
+                            Icons.person_rounded,
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _namaCtrl,
+                            readOnly: true,
+                            decoration: _inputDecoration(
+                              hint: 'Otomatis dari profil',
+                              prefix: const Icon(
+                                Icons.badge_rounded,
+                                color: Color(0xFF4CAF50),
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Lokasi
+                          _buildFieldLabel(
+                            'Lokasi Sampah',
+                            Icons.location_on_rounded,
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _lokasiCtrl,
+                            readOnly: true,
+                            maxLines: 2,
+                            minLines: 1,
+                            decoration: _inputDecoration(
+                              hint: 'Tap tombol lokasi untuk deteksi otomatis',
+                              prefix: const Icon(
+                                Icons.place_rounded,
+                                color: Color(0xFF4CAF50),
+                                size: 20,
+                              ),
+                              suffix: _isGettingLocation
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF4CAF50),
+                                        ),
+                                      ),
+                                    )
+                                  : IconButton(
+                                      onPressed: _getCurrentLocation,
+                                      icon: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [
+                                              Color(0xFF2E7D32),
+                                              Color(0xFF4CAF50),
+                                            ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.my_location,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            validator: (v) =>
+                                v!.isEmpty ? 'Lokasi wajib diisi' : null,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Keterangan
+                          _buildFieldLabel('Keterangan', Icons.notes_rounded),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _keteranganCtrl,
+                            maxLines: 4,
+                            minLines: 3,
+                            decoration: _inputDecoration(
+                              hint: 'Deskripsikan kondisi sampah ilegal...',
+                              prefix: Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Icon(
+                                  Icons.edit_note_rounded,
+                                  color: Colors.grey[400],
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                            validator: (v) =>
+                                v!.isEmpty ? 'Keterangan wajib diisi' : null,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 30),
-                    // 🚀 TOMBOL SUBMIT
+                    const SizedBox(height: 24),
+
+                    // ===== TOMBOL SUBMIT =====
                     SizedBox(
                       width: double.infinity,
-                      height: 52,
+                      height: 54,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _submitLaporan,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2E7D32),
+                          disabledBackgroundColor: Colors.grey[400],
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                           ),
+                          elevation: 0,
+                          shadowColor: const Color(0xFF2E7D32).withOpacity(0.4),
                         ),
                         child: _isLoading
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
+                            ? const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.5,
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'Mengirim Laporan...',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
                               )
                             : const Text(
-                                'UPLOAD LAPORAN',
+                                'Kirim Laporan',
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
+                                  letterSpacing: 0.3,
                                 ),
                               ),
                       ),
                     ),
-                    const SizedBox(
-                      height: 20,
-                    ), // Spacer agar form tidak mepet bubble tabs
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           ),
-          // ✅ BUBBLE TABS
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildBubble(
-                    'Sampah Ilegal',
-                    Icons.warning,
-                    true, // ✅ Aktif karena ini screen Laporan
-                    () {}, // Sudah di screen ini, tidak perlu action
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildBubble(
-                    'Riwayat',
-                    Icons.history,
-                    false,
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const RiwayatLaporanScreen(),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // ✅ BOTTOM NAVIGATION
-          _buildConsistentBottomNav(context),
+
+          // ============ BOTTOM NAV ============
+          _buildBottomNav(context),
         ],
       ),
+    );
+  }
+
+  Widget _buildFieldLabel(String text, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFF4CAF50)),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1B5E20),
+          ),
+        ),
+      ],
     );
   }
 }

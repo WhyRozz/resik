@@ -27,7 +27,7 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
   bool _isLoading = true;
   int _selectedIndex = 3;
   String _activeBubble = 'setor';
-  String _selectedFilter = 'all'; // all, pending, selesai, dibatalkan
+  String _selectedFilter = 'all';
 
   @override
   void initState() {
@@ -49,29 +49,6 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  Widget _buildMiniStat(String value, String label, IconData icon) {
-    return Column(
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: const Color(0xFF4CAF50)),
-            const SizedBox(width: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1B5E20),
-              ),
-            ),
-          ],
-        ),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-      ],
-    );
   }
 
   Future<void> _fetchJenisSampah() async {
@@ -155,7 +132,6 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
       if (_selectedFilter == 'all') {
         _filteredTransactions = _allTransactions;
       } else if (_selectedFilter == 'pending') {
-        // ✅ FIX: Exclude yang sudah dibatalkan
         _filteredTransactions = _allTransactions
             .where(
               (t) =>
@@ -177,7 +153,6 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
   }
 
   void _showEditDialog(Map<String, dynamic> item) async {
-    // Cek apakah bisa edit
     if (!item['can_edit']) {
       String reason = 'Tidak bisa diedit';
       if (item['is_confirmed'])
@@ -188,12 +163,11 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
         reason = 'Sudah lebih dari 24 jam';
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ $reason'), backgroundColor: Colors.orange),
+        SnackBar(content: Text(reason), backgroundColor: Colors.orange),
       );
       return;
     }
 
-    // Pastikan jenis sampah sudah load
     if (_jenisSampahList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -207,7 +181,6 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
     final beratCtrl = TextEditingController(text: item['berat'].toString());
     int selectedJenisId = item['id_jenis_sampah'];
 
-    // Cari harga dari list
     final selectedJenis = _jenisSampahList.firstWhere(
       (j) => j['id_jenis_sampah'] == selectedJenisId,
       orElse: () => {'harga': item['harga_per_kg']},
@@ -219,105 +192,277 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
 
     showDialog(
       context: context,
-      barrierDismissible: false, // Prevent accidental close
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Edit & Konfirmasi'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 8,
+          shadowColor: Colors.black.withOpacity(0.2),
+          backgroundColor: Colors.white,
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+          contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.edit_rounded,
+                  color: Color(0xFF2E7D32),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Edit & Konfirmasi',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1B5E20),
+                  ),
+                ),
+              ),
+            ],
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Pengguna: ${item['nama_pengguna']}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                if (_jenisSampahList.isEmpty)
-                  const Column(
+                // User Info
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF1F8E9), Color(0xFFE8F5E9)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFC8E6C9)),
+                  ),
+                  child: Row(
                     children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 8),
-                      Text('Loading...', style: TextStyle(color: Colors.grey)),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.person_outline_rounded,
+                          size: 16,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Pengguna',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              item['nama_pengguna'] ?? '-',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1B5E20),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Jenis Sampah
+                if (_jenisSampahList.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF2E7D32),
+                      ),
+                    ),
                   )
                 else
-                  DropdownButtonFormField<int>(
-                    value: selectedJenisId,
-                    decoration: const InputDecoration(
-                      labelText: 'Jenis Sampah',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _jenisSampahList.map((jenis) {
-                      return DropdownMenuItem<int>(
-                        value: jenis['id_jenis_sampah'],
-                        child: Text(
-                          '${jenis['jenis']} (Rp ${jenis['harga']}/kg)',
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Jenis Sampah',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1B5E20),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setDialogState(() {
-                        selectedJenisId = val!;
-                        final selected = _jenisSampahList.firstWhere(
-                          (j) => j['id_jenis_sampah'] == val,
-                        );
-                        hargaPerKg = selected['harga'].toDouble();
-                      });
-                    },
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonFormField<int>(
+                          value: selectedJenisId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(12),
+                              ),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                          ),
+                          items: _jenisSampahList.map((jenis) {
+                            final satuan = jenis['satuan'] ?? 'kg';
+                            return DropdownMenuItem<int>(
+                              value: jenis['id_jenis_sampah'],
+                              child: Text(
+                                '${jenis['jenis']} (Rp ${jenis['harga']}/$satuan)',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              selectedJenisId = val!;
+                              final selected = _jenisSampahList.firstWhere(
+                                (j) => j['id_jenis_sampah'] == val,
+                              );
+                              hargaPerKg = selected['harga'].toDouble();
+                            });
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: beratCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Berat (kg)',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (val) {
-                    setDialogState(() {}); // Refresh untuk update total
-                  },
+                const SizedBox(height: 16),
+
+                // Berat
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Berat (kg)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1B5E20),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TextField(
+                        controller: beratCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          hintText: '0.0',
+                        ),
+                        onChanged: (val) {
+                          setDialogState(() {});
+                        },
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
+
+                // Estimasi Total
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(8),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF4CAF50)),
                   ),
                   child: Column(
                     children: [
                       const Text(
                         'Estimasi Total:',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
+                      const SizedBox(height: 4),
                       Text(
-                        'Rp ${((double.tryParse(beratCtrl.text) ?? 0) * hargaPerKg).toStringAsFixed(0)}',
+                        _formatRupiah(
+                          (double.tryParse(beratCtrl.text) ?? 0) * hargaPerKg,
+                        ),
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF4CAF50),
+                          color: Color(0xFF1B5E20),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
+
+                // Warning
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.shade200),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: Colors.orange),
-                      SizedBox(width: 8),
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 16,
+                        color: Colors.orange.shade700,
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '⚠️ Edit hanya bisa dilakukan 1 kali',
-                          style: TextStyle(fontSize: 11, color: Colors.orange),
+                          'Edit hanya bisa dilakukan 1 kali',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.orange.shade800,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
@@ -329,7 +474,23 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal'),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Batal',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -347,11 +508,24 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
                 _konfirmasiSetor(item['id_transaksi'], selectedJenisId, berat);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
+                backgroundColor: const Color(0xFF2E7D32),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 2,
               ),
-              child: const Text('Konfirmasi'),
+              child: const Text(
+                'Konfirmasi',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
             ),
           ],
+          actionsAlignment: MainAxisAlignment.spaceBetween,
         ),
       ),
     );
@@ -380,7 +554,7 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
           'id_jenis_sampah': idJenis,
           'berat': berat,
           'id_petugas': adminData['id_petugas'],
-          'catatan': 'Dikonfirmasi admin',
+          'catatan': 'Dikonfirmasi Petugas',
         }),
       );
 
@@ -390,7 +564,7 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
           context.read<StatistikProvider>().fetchStatistik();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Berhasil dikonfirmasi!'),
+              content: Text('Berhasil dikonfirmasi!'),
               backgroundColor: Colors.green,
             ),
           );
@@ -398,7 +572,7 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('❌ ${result['message']}'),
+              content: Text(result['message'] ?? 'Gagal'),
               backgroundColor: Colors.red,
             ),
           );
@@ -415,26 +589,114 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Tolak Transaksi?'),
-        content: const Text(
-          'Transaksi akan dibatalkan dan tidak bisa dikembalikan.',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 8,
+        shadowColor: Colors.black.withOpacity(0.2),
+        backgroundColor: Colors.white,
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.warning_rounded,
+                color: Colors.red.shade700,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Tolak Transaksi?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: Colors.grey.shade700,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Transaksi akan dibatalkan dan tidak bisa dikembalikan.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Tidak'),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Tidak',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Ya, Tolak'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              elevation: 2,
+            ),
+            child: const Text(
+              'Ya, Tolak',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
+        actionsAlignment: MainAxisAlignment.spaceBetween,
       ),
     );
 
     if (confirm == true) {
-      // Show loading
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Membatalkan transaksi...'),
@@ -454,16 +716,15 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
           if (result['status'] == 'success') {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('✅ Transaksi berhasil dibatalkan'),
+                content: Text('Transaksi berhasil dibatalkan'),
                 backgroundColor: Colors.green,
               ),
             );
-            // ✅ Refresh data immediately
             await _loadData();
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('❌ ${result['message']}'),
+                content: Text(result['message'] ?? 'Gagal'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -482,29 +743,63 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF4CAF50),
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F8E9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Color(0xFF2E7D32),
+              size: 16,
+            ),
+          ),
           onPressed: () => Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (_) => const HomeAdminScreen()),
             (route) => false,
           ),
         ),
-        title: const Text(
-          'Riwayat Setor',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.recycling_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Riwayat Setor',
+              style: TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
-        ],
+        centerTitle: false,
       ),
       body: Column(
         children: [
-          // ✅ BUBBLE TABS
+          // BUBBLE TABS
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.white,
@@ -521,7 +816,7 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildBubble(
-                    'Riwayat Penjemputan',
+                    'Penjemputan',
                     Icons.local_shipping,
                     _activeBubble == 'penjemputan',
                     () {
@@ -537,35 +832,56 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
               ],
             ),
           ),
-          // ✅ STATISTICS CARDS
+          // STATISTICS CARDS
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: Colors.white,
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2E7D32).withOpacity(0.2),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildMiniStat(
+                _buildStatItem(
                   '${_statistics['hari_ini'] ?? 0}',
                   'Transaksi',
-                  Icons.receipt,
+                  Icons.receipt_long_rounded,
                 ),
-                Container(width: 1, height: 30, color: Colors.grey[300]),
-                _buildMiniStat(
-                  'Rp ${(_statistics['total_nominal_hari_ini'] ?? 0).toStringAsFixed(0)}',
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+                _buildStatItem(
+                  _formatRupiah(_statistics['total_nominal_hari_ini'] ?? 0),
                   'Total',
-                  Icons.attach_money,
+                  Icons.attach_money_rounded,
                 ),
-                Container(width: 1, height: 30, color: Colors.grey[300]),
-                _buildMiniStat(
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+                _buildStatItem(
                   '${(_statistics['total_berat_hari_ini'] ?? 0).toStringAsFixed(1)} kg',
                   'Berat',
-                  Icons.scale,
+                  Icons.scale_rounded,
                 ),
               ],
             ),
           ),
 
-          // ✅ FILTER TABS
+          // FILTER TABS
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.white,
@@ -585,27 +901,56 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
             ),
           ),
 
-          // ✅ TRANSACTION LIST
-          // ✅ TRANSACTION LIST
+          // TRANSACTION LIST dengan PULL-TO-REFRESH
           Expanded(
             child: RefreshIndicator(
               onRefresh: _loadData,
-              color: const Color(0xFF4CAF50),
+              color: const Color(0xFF2E7D32),
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _filteredTransactions.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inbox, size: 64, color: Colors.grey[300]),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Tidak ada transaksi ${_selectedFilter == 'all' ? '' : _selectedFilter}',
-                            style: TextStyle(color: Colors.grey[600]),
+                  ? ListView(
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height - 300,
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE8F5E9),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.inbox_rounded,
+                                    size: 60,
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Tidak ada transaksi',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Tarik ke bawah untuk refresh',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),
@@ -618,64 +963,65 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
             ),
           ),
 
-          // ✅ BOTTOM NAV
+          // BOTTOM NAV
           _buildBottomNav(),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(
-    String label,
-    String value,
-    Color color,
-    IconData icon,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+  Widget _buildStatItem(String value, String label, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: Colors.white),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, color: color.withOpacity(0.8)),
-          ),
-        ],
-      ),
+        ),
+        Text(
+          label,
+          style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.8)),
+        ),
+      ],
     );
   }
 
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _selectedFilter == value;
-    return FilterChip(
-      label: Text(
-        label,
-        style: TextStyle(color: isSelected ? Colors.white : Colors.grey[700]),
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
+    return GestureDetector(
+      onTap: () {
         setState(() {
           _selectedFilter = value;
           _applyFilter();
         });
       },
-      backgroundColor: Colors.grey[200],
-      selectedColor: const Color(0xFF4CAF50),
-      checkmarkColor: Colors.white,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+                )
+              : null,
+          color: isSelected ? null : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: isSelected ? null : Border.all(color: Colors.grey.shade300),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.grey[700],
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 
@@ -689,25 +1035,36 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
 
     Color statusColor;
     String statusText;
+    IconData statusIcon;
+
     if (isPending) {
       statusColor = Colors.orange;
       statusText = item['is_expired'] ? 'EXPIRED' : 'PENDING';
+      statusIcon = Icons.schedule_rounded;
     } else if (isDibatalkan) {
       statusColor = Colors.red;
       statusText = 'DIBATALKAN';
+      statusIcon = Icons.cancel_rounded;
     } else {
-      statusColor = Colors.green;
+      statusColor = const Color(0xFF2E7D32);
       statusText = 'SELESAI';
+      statusIcon = Icons.check_circle_rounded;
     }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isPending
+              ? Colors.orange.withOpacity(0.3)
+              : Colors.grey.shade200,
+          width: isPending ? 1.5 : 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -716,19 +1073,21 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // HEADER
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [
+                      statusColor.withOpacity(0.2),
+                      statusColor.withOpacity(0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.recycling,
-                  color: Color(0xFF4CAF50),
-                  size: 24,
-                ),
+                child: Icon(statusIcon, color: statusColor, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -736,25 +1095,30 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Setor Sampah',
+                      item['nama_pengguna'] ?? '-',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1B5E20),
+                        color: Color(0xFF1A1A1A),
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
-                      item['tanggal_transaksi'] ?? '-',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      _formatTanggal(item['tanggal_transaksi']),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: statusColor.withOpacity(0.3)),
                 ),
                 child: Text(
                   statusText,
@@ -762,31 +1126,89 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: statusColor,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Pengguna', item['nama_pengguna'] ?? '-'),
-          _buildInfoRow('Jenis', item['jenis_sampah'] ?? '-'),
-          _buildInfoRow('Berat', '${item['berat']} kg'),
+          Divider(color: Colors.grey.shade200, height: 1),
+          const SizedBox(height: 12),
+
+          // PEKERJAAN
+          if (item['pekerjaan'] != null &&
+              item['pekerjaan'].toString().isNotEmpty)
+            _buildInfoRow(
+              'Pekerjaan',
+              item['pekerjaan'],
+              Icons.work_outline_rounded,
+            ),
+
+          // JENIS SAMPAH
+          _buildInfoRow(
+            'Jenis',
+            item['jenis_sampah'] ?? '-',
+            Icons.eco_outlined,
+          ),
+
+          // BERAT
+          _buildInfoRow(
+            'Berat',
+            _formatBerat(item['berat']),
+            Icons.scale_outlined,
+          ),
+
+          // BERAT ASLI (jika ada)
           if (item['berat_asli'] != null)
-            _buildInfoRow('Berat Asli', '${item['berat_asli']} kg'),
-          _buildInfoRow('Total', 'Rp ${item['total_rupiah']}'),
-          if (item['catatan_koreksi'] != null)
-            _buildInfoRow('Catatan', item['catatan_koreksi']),
+            _buildInfoRow(
+              'Berat Asli',
+              _formatBerat(item['berat_asli']),
+              Icons.history_rounded,
+            ),
+
+          // TOTAL
+          _buildInfoRow(
+            'Total',
+            _formatRupiah(item['total_rupiah']),
+            Icons.payments_outlined,
+            isBold: true,
+          ),
+
+          // CATATAN
+          if (item['catatan_koreksi'] != null &&
+              item['catatan_koreksi'].toString().isNotEmpty)
+            _buildInfoRow(
+              'Catatan',
+              item['catatan_koreksi'],
+              Icons.note_alt_outlined,
+            ),
+
           const SizedBox(height: 16),
+
+          // ACTION BUTTONS
           if (isPending)
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: canEdit ? () => _showEditDialog(item) : null,
-                    icon: const Icon(Icons.edit, size: 18),
-                    label: Text(canEdit ? 'Edit' : 'Tidak Bisa Edit'),
+                    icon: const Icon(Icons.edit_rounded, size: 16),
+                    label: Text(
+                      canEdit ? 'Edit' : 'Tidak Bisa Edit',
+                      style: const TextStyle(fontSize: 12),
+                    ),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: canEdit ? null : Colors.grey,
+                      foregroundColor: canEdit
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey,
+                      side: BorderSide(
+                        color: canEdit ? const Color(0xFF2E7D32) : Colors.grey,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
@@ -798,68 +1220,124 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
                       item['id_jenis_sampah'],
                       item['berat'].toDouble(),
                     ),
-                    icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Setujui'),
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: const Text(
+                      'Setujui',
+                      style: TextStyle(fontSize: 12),
+                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: () => _tolakSetor(item['id_transaksi']),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  ),
+                  child: IconButton(
+                    onPressed: () => _tolakSetor(item['id_transaksi']),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.red,
+                      size: 18,
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(),
+                  ),
                 ),
               ],
             )
           else
-            // ✅ Jika sudah selesai/dibatalkan, tampilkan status saja
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    isSelesai
-                        ? '✅ Transaksi Selesai'
-                        : (isDibatalkan ? '❌ Transaksi Ditolak' : '-'),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isSelesai
-                          ? Colors.green
-                          : (isDibatalkan ? Colors.red : Colors.grey),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isSelesai
+                    ? const Color(0xFF2E7D32).withOpacity(0.05)
+                    : Colors.red.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isSelesai ? Icons.check_circle : Icons.cancel,
+                    size: 16,
+                    color: isSelesai ? const Color(0xFF2E7D32) : Colors.red,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isSelesai
+                          ? 'Transaksi Selesai'
+                          : (isDibatalkan ? 'Transaksi Ditolak' : '-'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isSelesai ? const Color(0xFF2E7D32) : Colors.red,
+                      ),
                     ),
                   ),
-                ),
-                if (item['tanggal_koreksi'] != null)
-                  Text(
-                    '(${DateFormat('dd/MM HH:mm').format(DateTime.parse(item['tanggal_koreksi']))})',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-              ],
+                  if (item['tanggal_koreksi'] != null)
+                    Text(
+                      _formatTanggalKoreksi(item['tanggal_koreksi']),
+                      style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    ),
+                ],
+              ),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(
+    String label,
+    String value,
+    IconData icon, {
+    bool isBold = false,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, size: 12, color: const Color(0xFF2E7D32)),
+          ),
+          const SizedBox(width: 8),
           SizedBox(
-            width: 90,
+            width: 70,
             child: Text(
               label,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
+          const SizedBox(width: 4),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF1B5E20),
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+                color: isBold
+                    ? const Color(0xFF2E7D32)
+                    : const Color(0xFF1A1A1A),
               ),
             ),
           ),
@@ -882,11 +1360,20 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
         decoration: BoxDecoration(
           gradient: isActive
               ? const LinearGradient(
-                  colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+                  colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
                 )
               : null,
           color: isActive ? null : const Color(0xFFE8F5E9),
           borderRadius: BorderRadius.circular(20),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF2E7D32).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -894,19 +1381,18 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
             Icon(
               icon,
               size: 18,
-              color: isActive ? Colors.white : const Color(0xFF4CAF50),
+              color: isActive ? Colors.white : const Color(0xFF2E7D32),
             ),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
                 label,
                 style: TextStyle(
-                  color: isActive ? Colors.white : const Color(0xFF4CAF50),
+                  color: isActive ? Colors.white : const Color(0xFF2E7D32),
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
                 maxLines: 1,
-                softWrap: false,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1007,5 +1493,67 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
         }),
       ),
     );
+  }
+}
+
+// FORMAT RUPIAH DENGAN TITIK
+String _formatRupiah(dynamic value) {
+  if (value == null) return 'Rp 0';
+  double angka = value is num
+      ? value.toDouble()
+      : double.tryParse(value.toString()) ?? 0;
+  return 'Rp ${angka.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+}
+
+// FORMAT BERAT TANPA .0
+String _formatBerat(dynamic value) {
+  if (value == null) return '0 kg';
+  double berat = value is num
+      ? value.toDouble()
+      : double.tryParse(value.toString()) ?? 0;
+
+  if (berat == berat.toInt()) {
+    return '${berat.toInt()} kg';
+  }
+  return '${berat.toStringAsFixed(1)} kg';
+}
+
+// FORMAT TANGGAL TRANSAKSI
+String _formatTanggal(String? tanggalStr) {
+  if (tanggalStr == null || tanggalStr.isEmpty) return '-';
+
+  try {
+    DateTime dt;
+
+    if (tanggalStr.endsWith('Z')) {
+      dt = DateTime.parse(tanggalStr);
+      dt = dt.add(const Duration(hours: 7));
+    } else {
+      dt = DateTime.parse(tanggalStr);
+    }
+
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  } catch (e) {
+    return tanggalStr;
+  }
+}
+
+// FORMAT TANGGAL KOREKSI
+String _formatTanggalKoreksi(String? tanggalStr) {
+  if (tanggalStr == null || tanggalStr.isEmpty) return '-';
+
+  try {
+    DateTime dt;
+
+    if (tanggalStr.endsWith('Z')) {
+      dt = DateTime.parse(tanggalStr);
+      dt = dt.add(const Duration(hours: 7));
+    } else {
+      dt = DateTime.parse(tanggalStr);
+    }
+
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  } catch (e) {
+    return tanggalStr;
   }
 }

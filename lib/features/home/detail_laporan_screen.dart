@@ -91,6 +91,18 @@ class DetailLaporanScreen extends StatelessWidget {
     );
   }
 
+  // ✅ HELPER: Format tanggal dengan jam (handle timezone)
+  String _formatTanggal(String? tanggalStr) {
+    if (tanggalStr == null || tanggalStr.isEmpty) return '-';
+    try {
+      final dt = DateTime.parse(tanggalStr);
+      final localDt = dt.toLocal();
+      return '${localDt.day.toString().padLeft(2, '0')}-${localDt.month.toString().padLeft(2, '0')}-${localDt.year} ${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return tanggalStr;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -452,7 +464,9 @@ class DetailLaporanScreen extends StatelessWidget {
                           iconColor: const Color(0xFF7B1FA2),
                           iconBgColor: const Color(0xFFF3E5F5),
                           label: 'Tanggal',
-                          value: laporan['tanggal'] ?? '-',
+                          value: _formatTanggal(
+                            laporan['tanggal'],
+                          ), // ← PAKAI HELPER
                           showDivider: true,
                         ),
                         const SizedBox(height: 16),

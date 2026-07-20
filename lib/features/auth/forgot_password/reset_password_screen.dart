@@ -17,44 +17,23 @@ class ResetPasswordScreen extends StatefulWidget {
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen>
-    with SingleTickerProviderStateMixin {
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final TextEditingController _passwordCtrl = TextEditingController();
   final TextEditingController _confirmPasswordCtrl = TextEditingController();
-  final GlobalKey _passwordFieldKey = GlobalKey();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-
-  // ✅ Animation controller untuk shake
-  late AnimationController _shakeController;
-  late Animation<double> _shakeAnimation;
+  bool _shakePassword = false;
 
   @override
   void initState() {
     super.initState();
-    // ✅ Setup shake animation
-    _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-    _shakeAnimation = Tween<double>(
-      begin: -10,
-      end: 10,
-    ).chain(CurveTween(curve: Curves.easeInOut)).animate(_shakeController);
-
-    // ✅ LISTENER untuk update real-time saat user mengetik
     _passwordCtrl.addListener(() {
-      setState(() {
-        // Rebuild UI setiap kali ada perubahan di password field
-      });
+      if (mounted) setState(() {});
     });
-
     _confirmPasswordCtrl.addListener(() {
-      setState(() {
-        // Rebuild UI setiap kali ada perubahan di confirm password field
-      });
+      if (mounted) setState(() {});
     });
   }
 
@@ -62,35 +41,34 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
   void dispose() {
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
-    _shakeController.dispose();
     super.dispose();
   }
 
-  // ✅ VALIDASI PASSWORD KUAT
   Map<String, bool> _validatePassword(String password) {
     return {
       'minLength': password.length >= 8,
       'hasUppercase': password.contains(RegExp(r'[A-Z]')),
       'hasLowercase': password.contains(RegExp(r'[a-z]')),
       'hasNumber': password.contains(RegExp(r'[0-9]')),
-      'hasSymbol': password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]')),
+      'hasSymbol': password.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]')),
     };
   }
 
-  // ✅ CEK APAKAH PASSWORD SUDAH KUAT
   bool _isPasswordStrong(String password) {
     final validation = _validatePassword(password);
-    return validation['minLength']! &&
-        validation['hasUppercase']! &&
-        validation['hasLowercase']! &&
-        validation['hasNumber']! &&
-        validation['hasSymbol']!;
+    return validation.values.every((v) => v);
   }
 
-  // ✅ SHAKE ANIMATION
-  void _shakeField() {
-    _shakeController.forward(from: 0).then((_) {
-      _showSnackBar('Password tidak memenuhi persyaratan!');
+  int _getPasswordStrength(String password) {
+    if (password.isEmpty) return 0;
+    final validation = _validatePassword(password);
+    return validation.values.where((v) => v).length;
+  }
+
+  void _triggerShake() {
+    setState(() => _shakePassword = true);
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _shakePassword = false);
     });
   }
 
@@ -98,48 +76,21 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     final password = _passwordCtrl.text.trim();
     final confirmPassword = _confirmPasswordCtrl.text.trim();
 
-    // Validasi password kuat
-    final validation = _validatePassword(password);
-
     if (password.isEmpty) {
-      _shakeField();
-      _showSnackBar('Password baru tidak boleh kosong');
+      _triggerShake();
+      _showSnackBar('Password baru tidak boleh kosong', isError: true);
       return;
     }
 
-    if (!validation['minLength']!) {
-      _shakeField();
-      _showSnackBar('Password minimal 8 karakter');
-      return;
-    }
-
-    if (!validation['hasUppercase']!) {
-      _shakeField();
-      _showSnackBar('Password harus mengandung huruf besar');
-      return;
-    }
-
-    if (!validation['hasLowercase']!) {
-      _shakeField();
-      _showSnackBar('Password harus mengandung huruf kecil');
-      return;
-    }
-
-    if (!validation['hasNumber']!) {
-      _shakeField();
-      _showSnackBar('Password harus mengandung angka');
-      return;
-    }
-
-    if (!validation['hasSymbol']!) {
-      _shakeField();
-      _showSnackBar('Password harus mengandung Simbol (!@#\$%&*)');
+    if (!_isPasswordStrong(password)) {
+      _triggerShake();
+      _showSnackBar('Password tidak memenuhi persyaratan!', isError: true);
       return;
     }
 
     if (password != confirmPassword) {
-      _shakeField();
-      _showSnackBar('Konfirmasi password tidak cocok');
+      _triggerShake();
+      _showSnackBar('Konfirmasi password tidak cocok', isError: true);
       return;
     }
 
@@ -157,30 +108,56 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
         }),
       );
 
+      if (!mounted) return;
       setState(() => _isLoading = false);
 
       final result = jsonDecode(response.body);
 
       if (result['status'] == 'success') {
-        _showSnackBar('Password berhasil direset');
+        _showSnackBar('Password berhasil direset!', isError: false);
         await Future.delayed(const Duration(seconds: 1));
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/login',
+            (route) => false,
+          );
+        }
       } else {
-        _showSnackBar(result['message'] ?? 'Gagal reset password');
+        _showSnackBar(
+          result['message'] ?? 'Gagal reset password',
+          isError: true,
+        );
       }
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showSnackBar('Terjadi kesalahan: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showSnackBar('Terjadi kesalahan: $e', isError: true);
+      }
     }
   }
 
-  void _showSnackBar(String message) {
+  void _showSnackBar(String message, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: const Color(0xFF2E7D32),
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle_outline,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(message, style: const TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+        backgroundColor: isError
+            ? const Color(0xFFE53935)
+            : const Color(0xFF22C55E),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -189,95 +166,179 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
   Widget build(BuildContext context) {
     final passwordValidation = _validatePassword(_passwordCtrl.text);
     final isStrongPassword = _isPasswordStrong(_passwordCtrl.text);
+    final strength = _getPasswordStrength(_passwordCtrl.text);
+    final isConfirmMatch =
+        _confirmPasswordCtrl.text.isNotEmpty &&
+        _passwordCtrl.text == _confirmPasswordCtrl.text;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF2E7D32), Color(0xFF4CAF50), Color(0xFF66BB6A)],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // Back Button
+              // Top Bar
               Padding(
-                padding: const EdgeInsets.only(top: 10, left: 10),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+                child: Row(
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Header Icon
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.lock_reset_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Title
+              const Text(
+                'Buat Password Baru',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFamily: 'Montserrat',
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  'Password baru harus kuat dan berbeda dari sebelumnya',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                    fontFamily: 'Montserrat',
+                    height: 1.4,
                   ),
                 ),
               ),
 
+              // Form Card
               Expanded(
                 child: Container(
                   margin: const EdgeInsets.only(top: 20),
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(20),
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(30),
+                      top: Radius.circular(32),
                     ),
                   ),
                   child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Judul
-                        const Text(
-                          'Password Baru',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1B5E20),
-                            fontFamily: 'Montserrat',
-                          ),
-                        ),
+                        // Password Baru
+                        _buildSectionLabel('Password Baru', Icons.lock_outline),
+                        const SizedBox(height: 10),
 
-                        const SizedBox(height: 30),
-
-                        // Input Password Baru
-                        _buildLabel('Masukkan Kata Sandi Baru'),
-
-                        // ✅ SHAKE ANIMATION WRAPPER
-                        AnimatedBuilder(
-                          animation: _shakeAnimation,
-                          builder: (context, child) {
-                            return Transform.translate(
-                              offset: Offset(_shakeAnimation.value, 0),
-                              child: child,
-                            );
-                          },
-                          child: _buildPasswordField(
-                            key: _passwordFieldKey,
+                        // Password Field dengan shake effect sederhana
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 100),
+                          transform: _shakePassword
+                              ? (Matrix4.identity()
+                                  ..translate(_shakePassword ? 10.0 : 0.0, 0))
+                              : Matrix4.identity(),
+                          child: _buildModernPasswordField(
                             controller: _passwordCtrl,
-                            hint: '••••••••',
+                            hint: 'Masukkan password baru',
                             obscureText: _obscurePassword,
                             onToggle: () {
                               setState(
                                 () => _obscurePassword = !_obscurePassword,
                               );
                             },
+                            isValid:
+                                _passwordCtrl.text.isNotEmpty &&
+                                isStrongPassword,
                           ),
                         ),
 
-                        // ✅ PASSWORD REQUIREMENTS INDICATOR
-                        _buildPasswordRequirements(
+                        const SizedBox(height: 12),
+
+                        // Strength Indicator
+                        _buildStrengthIndicator(strength),
+
+                        const SizedBox(height: 16),
+
+                        // Password Requirements
+                        _buildModernPasswordRequirements(
                           passwordValidation,
                           isStrongPassword,
                         ),
 
                         const SizedBox(height: 20),
 
-                        // Input Konfirmasi Password
-                        _buildLabel('Konfirmasi Kata Sandi'),
-                        _buildPasswordField(
+                        // Konfirmasi Password
+                        _buildSectionLabel(
+                          'Konfirmasi Password',
+                          Icons.lock_outline,
+                        ),
+                        const SizedBox(height: 10),
+
+                        _buildModernPasswordField(
                           controller: _confirmPasswordCtrl,
-                          hint: '••••••••',
+                          hint: 'Ulangi password baru',
                           obscureText: _obscureConfirmPassword,
                           onToggle: () {
                             setState(
@@ -285,80 +346,85 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
                                   !_obscureConfirmPassword,
                             );
                           },
+                          isValid: isConfirmMatch,
+                          showMatchIndicator:
+                              _confirmPasswordCtrl.text.isNotEmpty,
                         ),
-                        const SizedBox(height: 30),
 
-                        // Kembali ke Login
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pushReplacementNamed(context, '/login');
-                          },
-                          child: const Text(
-                            'Kembali ke Login?',
-                            style: TextStyle(
-                              color: Color(0xFF4CAF50),
-                              fontSize: 14,
-                              fontFamily: 'Montserrat',
+                        // Match indicator
+                        if (_confirmPasswordCtrl.text.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isConfirmMatch
+                                  ? const Color(0xFFE8F5E9)
+                                  : const Color(0xFFFFEBEE),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isConfirmMatch
+                                    ? const Color(0xFF22C55E).withOpacity(0.3)
+                                    : const Color(0xFFE53935).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isConfirmMatch
+                                      ? Icons.check_circle
+                                      : Icons.cancel,
+                                  size: 14,
+                                  color: isConfirmMatch
+                                      ? const Color(0xFF22C55E)
+                                      : const Color(0xFFE53935),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isConfirmMatch
+                                      ? 'Password cocok'
+                                      : 'Password tidak cocok',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: isConfirmMatch
+                                        ? const Color(0xFF1B5E20)
+                                        : const Color(0xFFC62828),
+                                    fontFamily: 'Montserrat',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+
+                        // Submit Button
+                        _buildSubmitButton(isStrongPassword, isConfirmMatch),
+
+                        const SizedBox(height: 12),
+
+                        // Back to Login
+                        Center(
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.pushReplacementNamed(context, '/login');
+                            },
+                            child: const Text(
+                              'Kembali ke Login',
+                              style: TextStyle(
+                                color: Color(0xFF4CAF50),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Montserrat',
+                              ),
                             ),
                           ),
                         ),
-
-                        const SizedBox(height: 20),
-
-                        // Tombol Kirim
-                        Container(
-                          width: double.infinity,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color:
-                                isStrongPassword &&
-                                    _confirmPasswordCtrl.text.isNotEmpty
-                                ? const Color(0xFF2E7D32)
-                                : Colors.grey[400],
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap:
-                                  (isStrongPassword &&
-                                      _confirmPasswordCtrl.text.isNotEmpty &&
-                                      !_isLoading)
-                                  ? _resetPassword
-                                  : null,
-                              borderRadius: BorderRadius.circular(12),
-                              child: Center(
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        height: 24,
-                                        width: 24,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Kirim',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Montserrat',
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -371,108 +437,51 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
     );
   }
 
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
+  Widget _buildSectionLabel(String text, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: Colors.white, size: 14),
+        ),
+        const SizedBox(width: 8),
+        Text(
           text,
           style: const TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.bold,
             color: Color(0xFF1B5E20),
             fontFamily: 'Montserrat',
           ),
         ),
-      ),
+      ],
     );
   }
 
-  // ✅ WIDGET PASSWORD REQUIREMENTS
-  Widget _buildPasswordRequirements(
-    Map<String, bool> validation,
-    bool isStrong,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isStrong ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isStrong ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Persyaratan Password:',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: isStrong
-                  ? const Color(0xFF1B5E20)
-                  : const Color(0xFFE65100),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _buildRequirementItem('Minimal 8 karakter', validation['minLength']!),
-          _buildRequirementItem(
-            'Huruf besar (A-Z)',
-            validation['hasUppercase']!,
-          ),
-          _buildRequirementItem(
-            'Huruf kecil (a-z)',
-            validation['hasLowercase']!,
-          ),
-          _buildRequirementItem('Angka (0-9)', validation['hasNumber']!),
-          _buildRequirementItem(
-            'Simbol (!@#\$%&*)', // ← Escape $ dengan backslash
-            validation['hasSymbol']!,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRequirementItem(String text, bool isMet) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          Icon(
-            isMet ? Icons.check_circle : Icons.circle_outlined,
-            size: 16,
-            color: isMet ? const Color(0xFF4CAF50) : Colors.grey[400],
-          ),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 11,
-              color: isMet ? const Color(0xFF1B5E20) : Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPasswordField({
-    Key? key,
+  Widget _buildModernPasswordField({
     required TextEditingController controller,
     required String hint,
     required bool obscureText,
     required VoidCallback onToggle,
+    bool isValid = false,
+    bool showMatchIndicator = false,
   }) {
     return Container(
-      key: key,
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F8E9),
-        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: showMatchIndicator
+              ? (isValid ? const Color(0xFF22C55E) : const Color(0xFFE53935))
+              : Colors.grey.shade200,
+          width: showMatchIndicator ? 2 : 1.5,
+        ),
       ),
       child: TextField(
         controller: controller,
@@ -480,27 +489,249 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
         style: const TextStyle(
           color: Color(0xFF1B5E20),
           fontFamily: 'Montserrat',
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
             color: Colors.grey[400],
             fontFamily: 'Montserrat',
+            fontSize: 13,
+          ),
+          prefixIcon: Icon(
+            Icons.lock_outline_rounded,
+            color: showMatchIndicator
+                ? (isValid ? const Color(0xFF22C55E) : const Color(0xFFE53935))
+                : const Color(0xFF4CAF50),
+            size: 20,
           ),
           suffixIcon: IconButton(
             icon: Icon(
-              obscureText ? Icons.visibility_off : Icons.visibility,
-              color: const Color(0xFF2E7D32),
+              obscureText
+                  ? Icons.visibility_off_rounded
+                  : Icons.visibility_rounded,
+              color: Colors.grey[500],
+              size: 20,
             ),
             onPressed: onToggle,
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
+          border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
-            vertical: 12,
+            vertical: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStrengthIndicator(int strength) {
+    final colors = [
+      Colors.grey.shade300,
+      const Color(0xFFE53935),
+      const Color(0xFFFF9800),
+      const Color(0xFFFFC107),
+      const Color(0xFF8BC34A),
+      const Color(0xFF22C55E),
+    ];
+
+    final labels = [
+      '',
+      'Sangat Lemah',
+      'Lemah',
+      'Sedang',
+      'Kuat',
+      'Sangat Kuat',
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: List.generate(5, (index) {
+            return Expanded(
+              child: Container(
+                height: 4,
+                margin: const EdgeInsets.only(right: 4),
+                decoration: BoxDecoration(
+                  color: index < strength
+                      ? colors[strength]
+                      : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            );
+          }),
+        ),
+        if (strength > 0) ...[
+          const SizedBox(height: 6),
+          Text(
+            labels[strength],
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: colors[strength],
+              fontFamily: 'Montserrat',
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildModernPasswordRequirements(
+    Map<String, bool> validation,
+    bool isStrong,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isStrong ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isStrong
+              ? const Color(0xFF22C55E).withOpacity(0.3)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isStrong ? Icons.check_circle : Icons.info_outline,
+                size: 16,
+                color: isStrong ? const Color(0xFF22C55E) : Colors.grey[500],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Persyaratan Password:',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isStrong ? const Color(0xFF1B5E20) : Colors.grey[700],
+                  fontFamily: 'Montserrat',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildModernRequirementItem(
+            'Minimal 8 karakter',
+            validation['minLength']!,
+          ),
+          _buildModernRequirementItem(
+            'Huruf besar (A-Z)',
+            validation['hasUppercase']!,
+          ),
+          _buildModernRequirementItem(
+            'Huruf kecil (a-z)',
+            validation['hasLowercase']!,
+          ),
+          _buildModernRequirementItem('Angka (0-9)', validation['hasNumber']!),
+          _buildModernRequirementItem(
+            'Simbol (!@#\$%&*)',
+            validation['hasSymbol']!,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernRequirementItem(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: isMet ? const Color(0xFF22C55E) : Colors.grey[300],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isMet ? Icons.check : Icons.close,
+              size: 10,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: isMet ? const Color(0xFF1B5E20) : Colors.grey[600],
+              fontWeight: isMet ? FontWeight.w600 : FontWeight.normal,
+              fontFamily: 'Montserrat',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubmitButton(bool isStrong, bool isMatch) {
+    final canSubmit = isStrong && isMatch && !_isLoading;
+
+    return Container(
+      width: double.infinity,
+      height: 54,
+      decoration: BoxDecoration(
+        gradient: canSubmit
+            ? const LinearGradient(
+                colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+              )
+            : null,
+        color: canSubmit ? null : Colors.grey[300],
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: canSubmit
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF4CAF50).withOpacity(0.4),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: canSubmit ? _resetPassword : null,
+          borderRadius: BorderRadius.circular(14),
+          child: Center(
+            child: _isLoading
+                ? const SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle_outline_rounded,
+                        color: canSubmit ? Colors.white : Colors.grey[500],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Reset Password',
+                        style: TextStyle(
+                          color: canSubmit ? Colors.white : Colors.grey[500],
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Montserrat',
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ),

@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../../../config/api_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +17,49 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true; // ✅ State untuk show/hide password
+  bool _obscurePassword = true;
+
+  // ✅ TAMBAH FUNCTION INI:
+  Future<void> _saveFcmTokenToBackend(String userId, String tipe) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedToken = prefs.getString('saved_fcm_token');
+
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      String? currentToken = await messaging.getToken();
+
+      print('🔵 FCM Token saat login: $currentToken');
+
+      if (currentToken != null) {
+        // ✅ PENTING: Hanya kirim ke backend jika token BERBEDA atau BELUM PERNAH disimpan
+        if (currentToken != savedToken) {
+          final response = await http.post(
+            Uri.parse(ApiConfig.saveFcmToken),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'user_id': int.parse(userId),
+              'tipe': tipe,
+              'fcm_token': currentToken,
+            }),
+          );
+
+          if (response.statusCode == 200) {
+            final result = jsonDecode(response.body);
+            if (result['status'] == 'success') {
+              print('✅ FCM Token berhasil disimpan ke backend!');
+              // ✅ Simpan token ke SharedPreferences agar tidak dikirim lagi saat login berikutnya
+              await prefs.setString('saved_fcm_token', currentToken);
+            }
+          }
+        } else {
+          print('✅ Token tidak berubah, skip pengiriman ke backend.');
+        }
+        // Jika currentToken == savedToken, tidak melakukan apa-apa (Hemat request)
+      }
+    } catch (e) {
+      print('❌ Error save FCM token: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -87,6 +130,9 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         debugPrint("✅ Login sukses! Tipe: $tipe, User ID: $userId");
+
+        // KIRIM FCM TOKEN KE BACKEND
+        await _saveFcmTokenToBackend(userId, tipe);
 
         double initialSaldo = 0;
         double initialSetoran = 0;

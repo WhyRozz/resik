@@ -315,12 +315,17 @@ class _RiwayatLaporanScreenState extends State<RiwayatLaporanScreen> {
     );
   }
 
-  // ✅ HELPER: Format tanggal dengan jam
+  // ✅ HELPER: Format tanggal dengan jam (handle timezone)
   String _formatTanggal(String? tanggalStr) {
     if (tanggalStr == null || tanggalStr.isEmpty) return '-';
     try {
+      // Parse dari string
       final dt = DateTime.parse(tanggalStr);
-      return '${dt.day.toString().padLeft(2, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+
+      // ✅ Convert ke local timezone (WIB/Asia/Jakarta)
+      final localDt = dt.toLocal();
+
+      return '${localDt.day.toString().padLeft(2, '0')}-${localDt.month.toString().padLeft(2, '0')}-${localDt.year} ${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return tanggalStr;
     }

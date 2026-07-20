@@ -14,6 +14,8 @@ import 'riwayat_laporan_screnn.dart';
 import 'riwayat_setor_screen.dart';
 import 'riwayat_penarikan_screen.dart';
 import 'info_tps_screen.dart';
+import 'package:intl/intl.dart';
+import '../notification/notification_list_screen.dart';
 
 // ✅ TAMBAHKAN IMPORT INI:
 import '../shared/jenis_sampah_list_screen.dart';
@@ -34,6 +36,7 @@ class HomeUserScreen extends StatefulWidget {
 
 class _HomeUserScreenState extends State<HomeUserScreen> {
   int _selectedIndex = 0;
+  int _unreadCount = 0;
 
   // ✅ Track bubble set mana yang aktif: 'laporan' | 'bank' | null
   String? _activeBubbleSet;
@@ -53,6 +56,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
   Future<void> _handleRefresh() async {
     await _fetchSaldo();
     await _fetchArtikel();
+    await _fetchUnreadCount();
   }
 
   @override
@@ -73,6 +77,33 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
       _fetchSaldo();
     }
     _fetchArtikel();
+  }
+
+  Future<void> _fetchUnreadCount() async {
+    if (_userData == null) return;
+
+    try {
+      final userId = (_userData!['id_masyarakat'] ?? _userData!['id_pns'])
+          .toString();
+      final userType = _userData!['tipe'];
+
+      final uri = Uri.parse(
+        ApiConfig.baseUrl + '/notifications/unread-count',
+      ).replace(queryParameters: {'user_id': userId, 'tipe': userType});
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (result['status'] == 'success' && mounted) {
+          setState(() {
+            _unreadCount = result['data']['unread_count'] ?? 0;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetch unread count: $e');
+    }
   }
 
   @override
@@ -105,6 +136,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
 
       _fetchSaldo();
       _fetchArtikel();
+      _fetchUnreadCount();
     }
   }
 
@@ -158,11 +190,11 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                 debugPrint("✅ Saldo: $saldo, Total Setoran: $totalSetoran");
 
                 setState(() {
-                  // ✅ Format saldo: hapus .00 jika bilangan bulat
-                  saldoText =
-                      "Rp ${saldo.toStringAsFixed(0).replaceAll(RegExp(r'(?<=\.\d*?)0+$'), '')}";
+                  // ✅ Format saldo dengan pemisah ribuan (titik)
+                  final formatRupiah = NumberFormat('#,##0', 'id_ID');
+                  saldoText = "Rp ${formatRupiah.format(saldo)}";
 
-                  // ✅ Format total_setoran: 1 desimal + "Kg" (sekarang aman karena sudah double)
+                  // ✅ Format total_setoran: 1 desimal + "Kg"
                   totalSetoranText = "${totalSetoran.toStringAsFixed(1)} Kg";
                 });
               } else {
@@ -522,25 +554,27 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
   }
 
   Widget _buildHeader() {
-    return GestureDetector(
-      onTap: () async {
-        // ✅ TUNGGU result dari ProfileScreen
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ProfileScreen()),
-        );
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          // ✅ HANYA FOTO PROFIL YANG BISA DIKLIK
+          GestureDetector(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
 
-        // ✅ Jika result true (profil diupdate), reload data
-        if (result == true && mounted) {
-          debugPrint("🔄 Profile updated, reloading home data...");
-          _loadUserData(); // ← Reload data dari SharedPreferences
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
+              // ✅ Reload data ketika kembali dari ProfileScreen
+              if (mounted) {
+                debugPrint(
+                  "🔄 Kembali dari ProfileScreen, reloading home data...",
+                );
+                _loadUserData();
+              }
+            },
+            child: CircleAvatar(
               radius: 30,
               backgroundColor: Colors.white,
               backgroundImage: _userData?['foto'] != null
@@ -550,35 +584,102 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                   ? const Icon(Icons.person, size: 40, color: Color(0xFF1B5E20))
                   : null,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Selamat Datang, Sobat Resik',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(width: 12),
+
+          // TEKS TIDAK BISA DIKLIK (tidak ada GestureDetector)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Selamat Datang, Sobat Resik',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                Text(
+                  _userData?['nama'] ?? 'User',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                  Text(
-                    _userData?['nama'] ?? 'User',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                ),
+              ],
+            ),
+          ),
+
+          // ✅ AREA ICON (terpisah)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ✅ ICON NOTIFIKASI DENGAN BADGE COUNTER (AREA TAP LEBIH BESAR)
+              Stack(
+                clipBehavior: Clip.none, // ← Badge tidak terpotong
+                children: [
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationListScreen(),
+                        ),
+                      ).then((_) => _fetchUnreadCount());
+                    },
+                    borderRadius: BorderRadius.circular(
+                      30,
+                    ), // ← Ripple berbentuk lingkaran
+                    child: Padding(
+                      padding: const EdgeInsets.all(8), // ← PERBESAR AREA TAP!
+                      child: const Icon(
+                        Icons.notifications_none,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
                   ),
+                  if (_unreadCount > 0)
+                    Positioned(
+                      right: 2, // ← Geser sedikit ke kiri agar tidak menutupi
+                      top: 2, // ← Geser sedikit ke bawah agar tidak menutupi
+                      child: IgnorePointer(
+                        // ← Badge TIDAK menghalangi klik!
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          child: Text(
+                            _unreadCount > 99 ? '99+' : _unreadCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
-            ),
-            InkWell(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const QrBarcodeScreen()),
+              const SizedBox(width: 16),
+              // ✅ ICON QR BARCODE
+              InkWell(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const QrBarcodeScreen()),
+                ),
+                child: const Icon(Icons.qr_code, color: Colors.white, size: 30),
               ),
-              child: const Icon(Icons.qr_code, color: Colors.white, size: 30),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -636,13 +737,18 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                       ),
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.money, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text(
-                          'Tarik Tunai',
+                        // ASSET GAMBAR SENDIRI
+                        Image.asset(
+                          'assets/images/money_home1.png',
+                          width: 32,
+                          height: 32,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Tarik Saldo',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -769,63 +875,188 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
 
   Widget _buildArtikelList() {
     if (_artikelList.isEmpty) {
-      return const Center(
-        child: Text('Belum ada artikel', style: TextStyle(color: Colors.grey)),
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.article_outlined, size: 40, color: Colors.grey[300]),
+              const SizedBox(height: 8),
+              Text(
+                'Belum ada artikel',
+                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
     return SizedBox(
-      height: 200,
+      height: 220,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         itemCount: _artikelList.length,
         itemBuilder: (context, index) {
-          final artikel = _artikelList[index];
+          final artikel = _artikelList[index] as Map<String, dynamic>;
           return GestureDetector(
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ArtikelDetailScreen(
-                    artikel: artikel as Map<String, dynamic>,
-                  ),
+                  builder: (context) => ArtikelDetailScreen(artikel: artikel),
                 ),
               );
             },
             child: Container(
-              width: 250,
+              width: 200,
               margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(12),
-                    ),
-                    child: Image.network(
-                      ApiConfig.imageUrl(artikel['foto']),
-                      height: 120,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          Container(height: 120, color: Colors.grey.shade200),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Text(
-                      artikel['judul'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                  // ✅ GAMBAR DENGAN GRADIENT OVERLAY
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                        child: Image.network(
+                          ApiConfig.imageUrl(artikel['foto']),
+                          height: 130,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                height: 130,
+                                color: Colors.grey.shade200,
+                                child: Icon(
+                                  Icons.image_outlined,
+                                  size: 40,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                        ),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      // Gradient overlay di bawah gambar
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: 50,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16),
+                            ),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.5),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // JUDUL ARTIKEL
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            artikel['judul'] ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1B5E20),
+                              height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          // Tanggal di kiri & Tombol Baca di kanan
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Tanggal di kiri
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_today_rounded,
+                                    size: 10,
+                                    color: Color(0xFF4CAF50),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatTanggalLengkap(artikel['tanggal']),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1B5E20),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // Tombol Baca di kanan
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF2E7D32),
+                                      Color(0xFF4CAF50),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Baca',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    SizedBox(width: 2),
+                                    Icon(
+                                      Icons.arrow_forward_rounded,
+                                      color: Colors.white,
+                                      size: 9,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -835,6 +1066,48 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
         },
       ),
     );
+  }
+
+  // TAMBAHKAN METHOD INI DI KELAS YANG SAMA
+  String _formatTanggalLengkap(dynamic dateString) {
+    if (dateString == null || dateString.toString().isEmpty) return '-';
+    final dateStr = dateString.toString().trim();
+
+    try {
+      DateTime? date;
+
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(dateStr)) {
+        date = DateTime.parse(dateStr.split(' ')[0]);
+      } else if (RegExp(r'^\d{2}-\d{2}-\d{4}$').hasMatch(dateStr)) {
+        final parts = dateStr.split('-');
+        date = DateTime(
+          int.parse(parts[2]),
+          int.parse(parts[1]),
+          int.parse(parts[0]),
+        );
+      }
+
+      if (date == null) return dateStr;
+
+      // Format lengkap: "13 Juli 2026"
+      final months = [
+        'Januari',
+        'Februari',
+        'Maret',
+        'April',
+        'Mei',
+        'Juni',
+        'Juli',
+        'Agustus',
+        'September',
+        'Oktober',
+        'November',
+        'Desember',
+      ];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return dateStr;
+    }
   }
 
   Widget _buildJenisSampahGrid() => GridView.count(
@@ -849,7 +1122,6 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
       _buildJenisSampahItem('Kertas', Icons.description),
       _buildJenisSampahItem('Logam', Icons.build),
       _buildJenisSampahItem('Kaca', Icons.camera),
-      _buildJenisSampahItem('Organik', Icons.eco),
       _buildJenisSampahItem('Kardus', Icons.inventory),
       _buildJenisSampahItem('Lainnya', Icons.category),
     ],

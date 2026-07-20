@@ -26,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _tglLahirCtrl = TextEditingController();
   final _jenisKelaminCtrl = TextEditingController();
   final _pekerjaanCtrl = TextEditingController();
+  final _wilayahKerjaCtrl = TextEditingController();
 
   // Controllers untuk Informasi Kontak
   final _emailCtrl = TextEditingController();
@@ -47,15 +48,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _newEmailCtrl = TextEditingController();
   final _newPasswordForEmailCtrl = TextEditingController();
   String? _emailVerificationCode;
+  bool _otpVerified = false;
 
   // Untuk verifikasi password
   final _otpPasswordCtrl = TextEditingController();
+  final _oldPasswordCtrl = TextEditingController();
   final _newPasswordCtrl = TextEditingController();
   final _confirmNewPasswordCtrl = TextEditingController();
   String? _passwordVerificationCode;
+  bool _showNewPassword = false;
+  bool _showConfirmPassword = false;
 
   String _getFotoUrl(String? path) {
     return ApiConfig.imageUrl(path);
+  }
+
+  int get userId {
+    return _userData['tipe'] == 'pns'
+        ? _userData['id_pns']
+        : _userData['id_masyarakat'];
   }
 
   @override
@@ -76,8 +87,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _profileImageFile = File(picked.path);
       });
-      // Jangan auto save, tunggu user klik simpan di section Data Pribadi
+
+      // ✅ AUTO-SAVE SETELAH PILIH FOTO
+      await _saveProfileImage();
     }
+  }
+
+  // ✅ FUNGSI ZOOM FOTO PROFIL
+  void _showProfileImagePopup(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            // ✅ FOTO DENGAN ZOOM
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                boundaryMargin: const EdgeInsets.all(20),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: 80,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // ✅ ICON SILANG DI POJOK KANAN ATAS
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 16,
+              right: 16,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(dialogContext),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.4),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadUserData() async {
@@ -96,6 +167,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         if (tipe == 'pns') {
           _pekerjaanCtrl.text = 'ASN/PNS - ${_userData['nama_dinas'] ?? '-'}';
+
+          // ✅ GABUNGKAN KECAMATAN DAN DESA UNTUK PNS
+          final kec = _userData['nama_kecamatan'] ?? '-';
+          final desa = _userData['nama_desa'] ?? '-';
+          _wilayahKerjaCtrl.text = '$kec, $desa';
         } else {
           _pekerjaanCtrl.text =
               'Masyarakat - ${_userData['nama_kecamatan'] ?? '-'}, ${_userData['nama_desa'] ?? '-'}';
@@ -141,7 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse(ApiConfig.profileUpdate),
+        Uri.parse(ApiConfig.updateFoto),
       );
 
       request.headers['Accept'] = 'application/json';
@@ -173,6 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'foto': result['data']?['foto'] ?? _userData['foto'],
           };
           await prefs.setString('user_data', jsonEncode(updatedData));
+          await _loadUserData();
           setState(() {
             _userData = updatedData;
             _profileImageFile = null;
@@ -196,8 +273,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _saveDataPribadi() async {
-    if (!_formKey.currentState!.validate()) return;
-
     // ✅ FIX AMAN: Ambil ID berdasarkan tipe user
     final String tipe = _userData['tipe'] ?? '';
     final dynamic userId = tipe == 'pns'
@@ -219,10 +294,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
-      final response = await http.put(
+      final response = await http.post(
         Uri.parse(ApiConfig.profileUpdate),
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           if (token != null && token.isNotEmpty)
             'Authorization': 'Bearer $token',
         },
@@ -240,8 +316,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }),
       );
 
+      print('🔵 Response Status: ${response.statusCode}');
+      print('🔵 Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
+        print('🔵 Result Status: ${result['status']}');
+
         if (result['status'] == 'success') {
           final updatedData = {
             ..._userData,
@@ -251,6 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'alamat': _alamatCtrl.text,
           };
           await prefs.setString('user_data', jsonEncode(updatedData));
+          await _loadUserData();
           setState(() {
             _userData = updatedData;
             _isEditingDataPribadi = false;
@@ -262,6 +344,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           );
         } else {
+          print('❌ Error: ${result['message']}');
+          print('❌ Errors: ${result['errors']}');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result['message'] ?? 'Gagal update'),
@@ -270,6 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         }
       } else {
+        print('❌ HTTP Error: ${response.statusCode}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Server Error: ${response.statusCode}'),
@@ -287,8 +372,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _saveKontak() async {
-    if (!_formKey.currentState!.validate()) return;
-
     // ✅ FIX AMAN: Ambil ID berdasarkan tipe user
     final String tipe = _userData['tipe'] ?? '';
     final dynamic userId = tipe == 'pns'
@@ -310,10 +393,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
-      final response = await http.put(
+      final response = await http.post(
         Uri.parse(ApiConfig.profileUpdate),
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           if (token != null && token.isNotEmpty)
             'Authorization': 'Bearer $token',
         },
@@ -329,6 +413,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (result['status'] == 'success') {
           final updatedData = {..._userData, 'no_telepon': _telpCtrl.text};
           await prefs.setString('user_data', jsonEncode(updatedData));
+          await _loadUserData();
           setState(() {
             _userData = updatedData;
             _isEditingKontak = false;
@@ -379,165 +464,477 @@ class _ProfileScreenState extends State<ProfileScreen> {
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          return AlertDialog(
+          return Dialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(24),
             ),
-            title: const Text(
-              'Ubah Email',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_emailVerificationCode == null) ...[
-                  const Text(
-                    'Kode verifikasi akan dikirim ke email Anda saat ini.',
-                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header Icon
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF22C55E).withOpacity(0.4),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.email_outlined,
+                      color: Colors.white,
+                      size: 32,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () async {
-                      // TODO: Call API to send verification code to current email
-                      setDialogState(() {
-                        _emailVerificationCode = '123456'; // Simulated code
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Kode verifikasi dikirim ke email Anda',
+                  const SizedBox(height: 20),
+
+                  // Title
+                  const Text(
+                    'Ubah Email',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1B5E20),
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Content berdasarkan step
+                  if (_emailVerificationCode == null) ...[
+                    // STEP 1: Input Email Baru
+                    const Text(
+                      'Masukkan email baru yang ingin Anda gunakan:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF6B7280),
+                        fontFamily: 'Poppins',
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Input Email
+                    TextField(
+                      controller: _newEmailCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'contoh@email.com',
+                        hintStyle: TextStyle(color: Colors.grey[400]),
+                        prefixIcon: const Icon(
+                          Icons.email_outlined,
+                          color: Color(0xFF22C55E),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF9FAFB),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF22C55E),
+                            width: 2,
                           ),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Kirim Kode'),
-                  ),
-                ] else if (_newEmailCtrl.text.isEmpty) ...[
-                  const Text(
-                    'Masukkan kode verifikasi yang dikirim ke email Anda:',
-                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _otpEmailCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Masukkan kode verifikasi',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              _emailVerificationCode = null;
-                              _otpEmailCtrl.clear();
-                            });
-                          },
-                          child: const Text('Kembali'),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_otpEmailCtrl.text == _emailVerificationCode) {
-                              setDialogState(() {
-                                _newEmailCtrl.text = ''; // Show email input
-                              });
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Kode verifikasi salah'),
-                                ),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF22C55E),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text('Verifikasi'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  const Text(
-                    'Masukkan email baru dan password untuk konfirmasi:',
-                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _newEmailCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Email baru',
-                      border: OutlineInputBorder(),
+                      keyboardType: TextInputType.emailAddress,
                     ),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _newPasswordForEmailCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Password',
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              _newEmailCtrl.text = '';
-                              _newPasswordForEmailCtrl.text = '';
-                            });
-                          },
-                          child: const Text('Kembali'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            // TODO: Call API to update email
+                    const SizedBox(height: 20),
+
+                    // Tombol Kirim Kode
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (_newEmailCtrl.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Email berhasil diubah!'),
+                                content: Text('Email baru wajib diisi'),
+                                backgroundColor: Colors.red,
                               ),
                             );
-                            if (mounted) Navigator.pop(context);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF22C55E),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            return;
+                          }
+
+                          final response = await http.post(
+                            Uri.parse(ApiConfig.sendEmailOtp),
+                            headers: ApiConfig.headers,
+                            body: jsonEncode({
+                              "user_id": userId,
+                              "tipe": _userData['tipe'],
+                              "email": _newEmailCtrl.text.trim(),
+                            }),
+                          );
+
+                          final result = jsonDecode(response.body);
+
+                          if (response.statusCode == 200) {
+                            _emailVerificationCode = "sent";
+                            setDialogState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(result['message']),
+                                backgroundColor: const Color(0xFF22C55E),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result['message'] ?? 'Gagal mengirim kode',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Text('Simpan'),
+                          elevation: 4,
+                          shadowColor: const Color(0xFF22C55E).withOpacity(0.4),
+                        ),
+                        child: const Text(
+                          'Kirim Kode Verifikasi',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ] else if (!_otpVerified) ...[
+                    // STEP 2: Input OTP
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF22C55E).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.check_circle_outline,
+                            color: Color(0xFF22C55E),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Kode telah dikirim ke ${_newEmailCtrl.text}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF1B5E20),
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    const Text(
+                      'Masukkan kode verifikasi 4 digit:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF6B7280),
+                        fontFamily: 'Poppins',
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Input OTP
+                    TextField(
+                      controller: _otpEmailCtrl,
+                      decoration: InputDecoration(
+                        hintText: '0000',
+                        hintStyle: TextStyle(color: Colors.grey[400]),
+                        prefixIcon: const Icon(
+                          Icons.lock_outline,
+                          color: Color(0xFF22C55E),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF9FAFB),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF22C55E),
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                      ),
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 8,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Tombol Verifikasi
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final response = await http.post(
+                            Uri.parse(ApiConfig.verifyEmailOtp),
+                            headers: ApiConfig.headers,
+                            body: jsonEncode({
+                              "user_id": userId,
+                              "tipe": _userData['tipe'],
+                              "otp": _otpEmailCtrl.text.trim(),
+                            }),
+                          );
+
+                          final result = jsonDecode(response.body);
+
+                          if (response.statusCode == 200 &&
+                              result['status'] == 'success') {
+                            setDialogState(() {
+                              _otpVerified = true;
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Kode verifikasi benar'),
+                                backgroundColor: Color(0xFF22C55E),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result['message'] ?? 'Kode verifikasi salah',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 4,
+                          shadowColor: const Color(0xFF22C55E).withOpacity(0.4),
+                        ),
+                        child: const Text(
+                          'Verifikasi Kode',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Tombol Kembali
+                    TextButton(
+                      onPressed: () async {
+                        setDialogState(() {
+                          _emailVerificationCode = null;
+                          _otpEmailCtrl.clear();
+                        });
+                      },
+                      child: const Text(
+                        '← Kirim Ulang Kode',
+                        style: TextStyle(
+                          color: Color(0xFF22C55E),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    // STEP 3: Sukses
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF22C55E).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            color: Color(0xFF22C55E),
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Verifikasi Berhasil!',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1B5E20),
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Email akan diubah ke ${_newEmailCtrl.text}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF6B7280),
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Tombol Simpan
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final response = await http.put(
+                            Uri.parse(ApiConfig.updateEmail),
+                            headers: ApiConfig.headers,
+                            body: jsonEncode({
+                              "user_id": userId,
+                              "tipe": _userData['tipe'],
+                              "email": _newEmailCtrl.text.trim(),
+                              "otp": _otpEmailCtrl.text.trim(),
+                            }),
+                          );
+
+                          final result = jsonDecode(response.body);
+
+                          if (response.statusCode == 200 &&
+                              result['status'] == 'success') {
+                            _userData['email'] = _newEmailCtrl.text.trim();
+
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setString(
+                              "user_data",
+                              jsonEncode(_userData),
+                            );
+
+                            await _loadUserData();
+
+                            if (mounted) Navigator.pop(context);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result['message'] ?? 'Email berhasil diubah!',
+                                ),
+                                backgroundColor: const Color(0xFF22C55E),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  result['message'] ?? 'Gagal mengubah email',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 4,
+                          shadowColor: const Color(0xFF22C55E).withOpacity(0.4),
+                        ),
+                        child: const Text(
+                          'Simpan Perubahan',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Tombol Batal
+                    TextButton(
+                      onPressed: () {
+                        setDialogState(() {
+                          _emailVerificationCode = null;
+                          _otpVerified = false;
+                          _otpEmailCtrl.clear();
+                          _newEmailCtrl.clear();
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           );
         },
@@ -546,6 +943,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showPasswordChangeDialog() {
+    // Reset state dialog
+    _passwordVerificationCode = null;
+    _otpPasswordCtrl.clear();
+    _newPasswordCtrl.clear();
+    _confirmNewPasswordCtrl.clear();
+    _showNewPassword = false;
+    _showConfirmPassword = false;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -554,137 +959,620 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final validation = _validatePassword(_newPasswordCtrl.text);
           final isStrong = _isPasswordStrong(_newPasswordCtrl.text);
 
-          return AlertDialog(
+          return Dialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(24),
             ),
-            title: const Text(
-              'Ubah Password',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_passwordVerificationCode == null) ...[
-                  const Text(
-                    'Kode verifikasi akan dikirim ke email Anda.',
-                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () async {
-                      // TODO: Call API to send verification code
-                      setDialogState(() {
-                        _passwordVerificationCode = '123456'; // Simulated
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Kode verifikasi dikirim ke email Anda',
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header Icon
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF22C55E).withOpacity(0.4),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.lock_outline,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Title
+                    const Text(
+                      'Ubah Password',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1B5E20),
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // STEP 1: KIRIM OTP
+                    if (_passwordVerificationCode == null) ...[
+                      const Text(
+                        'Kode verifikasi akan dikirim ke email Anda untuk keamanan.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B7280),
+                          fontFamily: 'Poppins',
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Email Info Box
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3F2FD),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF2196F3).withOpacity(0.3),
                           ),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF22C55E),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Kirim Kode'),
-                  ),
-                ] else if (_newPasswordCtrl.text.isEmpty) ...[
-                  const Text(
-                    'Masukkan password baru Anda:',
-                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _newPasswordCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Password baru',
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                    onChanged: (val) => setDialogState(() {}),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _confirmNewPasswordCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Konfirmasi password baru',
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildPasswordRequirements(validation, isStrong),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              _passwordVerificationCode = null;
-                              _newPasswordCtrl.clear();
-                              _confirmNewPasswordCtrl.clear();
-                            });
-                          },
-                          child: const Text('Kembali'),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.email_outlined,
+                              size: 18,
+                              color: Colors.blue.shade700,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Email terdaftar',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF6B7280),
+                                      fontFamily: 'Poppins',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _userData['email'] ?? '-',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1976D2),
+                                      fontFamily: 'Poppins',
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
+                      const SizedBox(height: 24),
+
+                      // Tombol Kirim Kode
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
                         child: ElevatedButton(
                           onPressed: () async {
-                            if (!isStrong) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Password tidak memenuhi persyaratan',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-                            if (_newPasswordCtrl.text !=
-                                _confirmNewPasswordCtrl.text) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Konfirmasi password tidak cocok',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-                            // TODO: Call API to update password
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Password berhasil diubah!'),
-                              ),
+                            final response = await http.post(
+                              Uri.parse(ApiConfig.sendEmailOtp),
+                              headers: ApiConfig.headers,
+                              body: jsonEncode({
+                                "user_id": userId,
+                                "tipe": _userData['tipe'],
+                              }),
                             );
-                            if (mounted) Navigator.pop(context);
+
+                            final result = jsonDecode(response.body);
+
+                            if (response.statusCode == 200 &&
+                                result['status'] == 'success') {
+                              setDialogState(() {
+                                _passwordVerificationCode = "sent";
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    result['message'] ??
+                                        'Kode OTP telah dikirim',
+                                  ),
+                                  backgroundColor: const Color(0xFF22C55E),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    result['message'] ?? 'Gagal mengirim OTP',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF22C55E),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 4,
+                            shadowColor: const Color(
+                              0xFF22C55E,
+                            ).withOpacity(0.4),
+                          ),
+                          child: const Text(
+                            'Kirim Kode Verifikasi',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Tombol Batal
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+
+                      // STEP 2: VERIFIKASI OTP
+                    ] else if (!_otpVerified) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF22C55E).withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start, // ← TAMBAH INI
+                          children: [
+                            const Icon(
+                              Icons.check_circle_outline,
+                              color: Color(0xFF22C55E),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                // ← GANTI Row jadi Column
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Kode verifikasi telah dikirim ke:',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF6B7280),
+                                      fontFamily: 'Poppins',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _userData['email'] ?? '-',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1B5E20),
+                                      fontFamily: 'Poppins',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      const Text(
+                        'Masukkan kode verifikasi 4 digit:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B7280),
+                          fontFamily: 'Poppins',
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Input OTP
+                      TextField(
+                        controller: _otpPasswordCtrl,
+                        decoration: InputDecoration(
+                          hintText: '0000',
+                          hintStyle: TextStyle(color: Colors.grey[400]),
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            color: Color(0xFF22C55E),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF9FAFB),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF22C55E),
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                        keyboardType: TextInputType.number,
+                        maxLength: 4,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 8,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Tombol Verifikasi
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            if (_otpPasswordCtrl.text.trim().length != 4) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('OTP harus 4 digit'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            final response = await http.post(
+                              Uri.parse(ApiConfig.verifyEmailOtp),
+                              headers: ApiConfig.headers,
+                              body: jsonEncode({
+                                "user_id": userId,
+                                "tipe": _userData['tipe'],
+                                "otp": _otpPasswordCtrl.text.trim(),
+                              }),
+                            );
+
+                            final result = jsonDecode(response.body);
+
+                            if (response.statusCode == 200 &&
+                                result['status'] == 'success') {
+                              FocusScope.of(context).unfocus();
+
+                              setDialogState(() {
+                                _otpVerified = true;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Verifikasi berhasil! Silakan masukkan password baru',
+                                  ),
+                                  backgroundColor: Color(0xFF22C55E),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    result['message'] ??
+                                        'Kode verifikasi salah',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF22C55E),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 4,
+                            shadowColor: const Color(
+                              0xFF22C55E,
+                            ).withOpacity(0.4),
+                          ),
+                          child: const Text(
+                            'Verifikasi Kode',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Tombol Kembali
+                      TextButton(
+                        onPressed: () {
+                          setDialogState(() {
+                            _passwordVerificationCode = null;
+                            _otpPasswordCtrl.clear();
+                          });
+                        },
+                        child: const Text(
+                          '← Kirim Ulang Kode',
+                          style: TextStyle(
+                            color: Color(0xFF22C55E),
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+
+                      // STEP 3: FORM PASSWORD BARU
+                    ] else ...[
+                      const Text(
+                        'Masukkan kata sandi baru',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1B5E20),
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Password Baru
+                      TextField(
+                        controller: _newPasswordCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Password baru',
+                          hintStyle: TextStyle(color: Colors.grey[400]),
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            color: Color(0xFF22C55E),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showNewPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                _showNewPassword = !_showNewPassword;
+                              });
+                            },
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF9FAFB),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF22C55E),
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                        obscureText: !_showNewPassword,
+                        onChanged: (val) => setDialogState(() {}),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Konfirmasi Password
+                      TextField(
+                        controller: _confirmNewPasswordCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Konfirmasi password baru',
+                          hintStyle: TextStyle(color: Colors.grey[400]),
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            color: Color(0xFF22C55E),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _showConfirmPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                _showConfirmPassword = !_showConfirmPassword;
+                              });
+                            },
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF9FAFB),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF22C55E),
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                        obscureText: !_showConfirmPassword,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Password Requirements
+                      _buildModernPasswordRequirements(validation, isStrong),
+                      const SizedBox(height: 24),
+
+                      // Tombol Simpan
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: isStrong
+                              ? () async {
+                                  if (_newPasswordCtrl.text !=
+                                      _confirmNewPasswordCtrl.text) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Konfirmasi password tidak cocok',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  final response = await http.put(
+                                    Uri.parse(ApiConfig.updatePassword),
+                                    headers: ApiConfig.headers,
+                                    body: jsonEncode({
+                                      "user_id": userId,
+                                      "tipe": _userData['tipe'],
+                                      "password_baru": _newPasswordCtrl.text,
+                                      "password_baru_confirmation":
+                                          _confirmNewPasswordCtrl.text,
+                                      "otp": _otpPasswordCtrl.text.trim(),
+                                    }),
+                                  );
+
+                                  final result = jsonDecode(response.body);
+
+                                  if (response.statusCode == 200 &&
+                                      result['status'] == 'success') {
+                                    if (mounted) Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          result['message'] ??
+                                              'Password berhasil diubah!',
+                                        ),
+                                        backgroundColor: const Color(
+                                          0xFF22C55E,
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          result['message'] ??
+                                              'Gagal mengubah password',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isStrong
                                 ? const Color(0xFF22C55E)
+                                : Colors.grey[300],
+                            foregroundColor: isStrong
+                                ? Colors.white
                                 : Colors.grey,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: isStrong ? 4 : 0,
+                            shadowColor: isStrong
+                                ? const Color(0xFF22C55E).withOpacity(0.4)
+                                : Colors.transparent,
+                          ),
+                          child: const Text(
+                            'Simpan Perubahan',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
                             ),
                           ),
-                          child: const Text('Simpan'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Tombol Batal
+                      TextButton(
+                        onPressed: () {
+                          _newPasswordCtrl.clear();
+                          _confirmNewPasswordCtrl.clear();
+                          Navigator.pop(context);
+                        },
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Poppins',
+                          ),
                         ),
                       ),
                     ],
-                  ),
-                ],
-              ],
+                  ],
+                ),
+              ),
             ),
           );
         },
@@ -711,43 +1599,96 @@ class _ProfileScreenState extends State<ProfileScreen> {
         validation['hasSymbol']!;
   }
 
-  Widget _buildPasswordRequirements(
+  Widget _buildModernPasswordRequirements(
     Map<String, bool> validation,
     bool isStrong,
   ) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isStrong ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isStrong ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
-          width: 1,
+          color: isStrong ? const Color(0xFF22C55E) : const Color(0xFFFF9800),
+          width: 1.5,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Persyaratan Password:',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Poppins',
-            ),
+          Row(
+            children: [
+              Icon(
+                isStrong ? Icons.check_circle : Icons.info_outline,
+                size: 18,
+                color: isStrong
+                    ? const Color(0xFF22C55E)
+                    : const Color(0xFFFF9800),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Persyaratan Password:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isStrong
+                      ? const Color(0xFF1B5E20)
+                      : const Color(0xFFF57C00),
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          _buildRequirementItem('Minimal 8 karakter', validation['minLength']!),
-          _buildRequirementItem(
+          const SizedBox(height: 12),
+          _buildModernRequirementItem(
+            'Minimal 8 karakter',
+            validation['minLength']!,
+          ),
+          _buildModernRequirementItem(
             'Huruf besar (A-Z)',
             validation['hasUppercase']!,
           ),
-          _buildRequirementItem(
+          _buildModernRequirementItem(
             'Huruf kecil (a-z)',
             validation['hasLowercase']!,
           ),
-          _buildRequirementItem('Angka (0-9)', validation['hasNumber']!),
-          _buildRequirementItem('Simbol (!@#\$%&*)', validation['hasSymbol']!),
+          _buildModernRequirementItem('Angka (0-9)', validation['hasNumber']!),
+          _buildModernRequirementItem(
+            'Simbol (!@#\$%&*)',
+            validation['hasSymbol']!,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernRequirementItem(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: isMet ? const Color(0xFF22C55E) : Colors.grey[300],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isMet ? Icons.check : Icons.close,
+              size: 12,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: isMet ? const Color(0xFF1B5E20) : Colors.grey[600],
+              fontWeight: isMet ? FontWeight.w600 : FontWeight.normal,
+              fontFamily: 'Poppins',
+            ),
+          ),
         ],
       ),
     );
@@ -777,7 +1718,128 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _logout() async {
+  void _showLogoutConfirmationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible:
+          false, // User harus memilih tombol, tidak bisa klik luar
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ✅ Icon dengan Gradien Modern
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFEF4444).withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.logout_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ✅ Judul
+              const Text(
+                'Keluar dari Aplikasi?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F2937),
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // ✅ Subtitle
+              const Text(
+                'Apakah Anda yakin ingin keluar? Anda harus login kembali untuk mengakses akun Anda.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // ✅ Tombol Aksi
+              Row(
+                children: [
+                  // Tombol Batal
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      ),
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF6B7280),
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Tombol Ya, Keluar
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context); // Tutup dialog dulu
+                        _performLogout(); // Baru jalankan logout
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                        shadowColor: const Color(0xFFEF4444).withOpacity(0.4),
+                      ),
+                      child: const Text(
+                        'Ya, Keluar',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _performLogout() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
@@ -808,15 +1870,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _showNotifications() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Fitur pesan masuk segera hadir'),
-        backgroundColor: Color(0xFF22C55E),
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _namaCtrl.dispose();
@@ -825,6 +1878,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _tglLahirCtrl.dispose();
     _alamatCtrl.dispose();
     _pekerjaanCtrl.dispose();
+    _wilayahKerjaCtrl.dispose();
     _otpEmailCtrl.dispose();
     _newEmailCtrl.dispose();
     _newPasswordForEmailCtrl.dispose();
@@ -909,13 +1963,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   fontFamily: 'Poppins',
                                 ),
                               ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.notifications_none,
-                                  color: Colors.white,
-                                ),
-                                onPressed: _showNotifications,
-                              ),
+                              const SizedBox(
+                                width: 48,
+                              ), // Placeholder agar layout tetap rapi
                             ],
                           ),
                         ),
@@ -923,46 +1973,114 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         // Profile Image dengan Preview
                         Stack(
                           children: [
-                            Container(
-                              width: 90,
-                              height: 90,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 3,
-                                ),
-                              ),
-                              child: ClipOval(
-                                child: _profileImageFile != null
-                                    ? Image.file(
-                                        _profileImageFile!,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : (_userData['foto'] != null &&
-                                              _userData['foto']
-                                                  .toString()
-                                                  .isNotEmpty
-                                          ? Image.network(
-                                              _getFotoUrl(_userData['foto']),
-                                              fit: BoxFit.cover,
-                                              errorBuilder:
-                                                  (
-                                                    context,
-                                                    error,
-                                                    stackTrace,
-                                                  ) => const Icon(
-                                                    Icons.person,
-                                                    size: 50,
-                                                    color: Color(0xFF22C55E),
+                            // ✅ BUNGKUS DENGAN GESTURE DETECTOR UNTUK ZOOM
+                            GestureDetector(
+                              onTap: () {
+                                // ✅ Tampilkan foto full screen jika ada
+                                if (_profileImageFile != null) {
+                                  // Jika ada foto baru yang belum diupload
+                                  showDialog(
+                                    context: context,
+                                    builder: (dialogContext) => Dialog(
+                                      backgroundColor: Colors.black,
+                                      insetPadding: EdgeInsets.zero,
+                                      child: Stack(
+                                        children: [
+                                          Center(
+                                            child: InteractiveViewer(
+                                              minScale: 0.5,
+                                              maxScale: 4.0,
+                                              child: Image.file(
+                                                _profileImageFile!,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            top:
+                                                MediaQuery.of(
+                                                  context,
+                                                ).padding.top +
+                                                16,
+                                            right: 16,
+                                            child: GestureDetector(
+                                              onTap: () =>
+                                                  Navigator.pop(dialogContext),
+                                              child: Container(
+                                                padding: const EdgeInsets.all(
+                                                  10,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white
+                                                      .withOpacity(0.2),
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: Colors.white
+                                                        .withOpacity(0.4),
+                                                    width: 1.5,
                                                   ),
-                                            )
-                                          : const Icon(
-                                              Icons.person,
-                                              size: 50,
-                                              color: Color(0xFF22C55E),
-                                            )),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.close_rounded,
+                                                  color: Colors.white,
+                                                  size: 24,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                } else if (_userData['foto'] != null &&
+                                    _userData['foto'].toString().isNotEmpty) {
+                                  // ✅ Tampilkan foto dari server
+                                  _showProfileImagePopup(
+                                    _userData['foto'].toString(),
+                                  );
+                                }
+                              },
+                              child: Container(
+                                width: 90,
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3,
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: _profileImageFile != null
+                                      ? Image.file(
+                                          _profileImageFile!,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : (_userData['foto'] != null &&
+                                                _userData['foto']
+                                                    .toString()
+                                                    .isNotEmpty
+                                            ? Image.network(
+                                                _userData['foto'].toString(),
+                                                fit: BoxFit.cover,
+                                                errorBuilder:
+                                                    (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) => const Icon(
+                                                      Icons.person,
+                                                      size: 50,
+                                                      color: Color(0xFF22C55E),
+                                                    ),
+                                              )
+                                            : const Icon(
+                                                Icons.person,
+                                                size: 50,
+                                                color: Color(0xFF22C55E),
+                                              )),
+                                ),
                               ),
                             ),
                             Positioned(
@@ -1117,6 +2235,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: Icons.work_outline,
                         ),
                         const SizedBox(height: 8),
+
+                        // ✅ TAMBAHKAN INI: Tampilkan khusus jika user adalah PNS
+                        if (userType == 'pns') ...[
+                          _buildInfoField(
+                            label: 'Kecamatan / Desa',
+                            value: _wilayahKerjaCtrl.text,
+                            icon: Icons.location_city,
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+
                         _buildEditableField(
                           label: 'Alamat',
                           value: _alamatCtrl.text.isNotEmpty
@@ -1154,10 +2283,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 child: ElevatedButton(
                                   onPressed: _isSaving
                                       ? null
-                                      : () {
-                                          _saveDataPribadi();
-                                          if (_profileImageFile != null)
-                                            _saveProfileImage();
+                                      : () async {
+                                          await _saveDataPribadi(); // ← HANYA INI, TIDAK PERLU UPLOAD FOTO LAGI
                                         },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF22C55E),
@@ -1293,7 +2420,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 12),
                         _buildInfoFieldWithAction(
                           label: 'Ubah Password',
-                          value: '(Klik untuk mengubah)',
+                          value: '(Klik icon edit untuk mengubah)',
                           icon: Icons.vpn_key,
                           onTap: _isEditingPassword
                               ? _showPasswordChangeDialog
@@ -1307,15 +2434,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: _logout,
-                            icon: const Icon(Icons.logout, color: Colors.red),
+                            onPressed:
+                                _showLogoutConfirmationDialog, // ✅ UBAH KE METHOD DIALOG
+                            icon: const Icon(
+                              Icons.logout_rounded,
+                              color: Color(0xFFEF4444),
+                            ),
                             label: const Text(
-                              'Keluar',
-                              style: TextStyle(color: Colors.red),
+                              'Keluar dari Akun',
+                              style: TextStyle(
+                                color: Color(0xFFEF4444),
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Poppins',
+                              ),
                             ),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(
-                                color: Colors.red,
+                                color: Color(0xFFEF4444),
                                 width: 1.5,
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1362,14 +2497,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ],
         ),
-        IconButton(
-          icon: Icon(
-            isEditing ? Icons.check : Icons.edit,
-            size: 20,
-            color: isEditing ? const Color(0xFF22C55E) : Colors.grey,
+        // ✅ ICON HANYA MUNCUL KETIKA TIDAK SEDANG EDIT
+        if (!isEditing)
+          IconButton(
+            icon: const Icon(Icons.edit, size: 20, color: Colors.grey),
+            onPressed: onTap,
           ),
-          onPressed: onTap,
-        ),
       ],
     );
   }
@@ -1413,8 +2546,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 isEditing
                     ? isDropdown
                           ? DropdownButtonFormField<String>(
-                              value: dropdownItems!.contains(value)
-                                  ? value
+                              value: controller.text.isNotEmpty
+                                  ? controller.text
                                   : null,
                               decoration: const InputDecoration(
                                 isDense: true,
@@ -1428,7 +2561,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                 ),
                               ),
-                              items: dropdownItems
+                              items: (dropdownItems ?? [])
                                   .map(
                                     (item) => DropdownMenuItem(
                                       value: item,
@@ -1436,20 +2569,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                   )
                                   .toList(),
-                              onChanged: (val) => controller.text = val ?? '',
+                              onChanged: (val) {
+                                setState(() {
+                                  controller.text = val ?? '';
+                                });
+                              },
                             )
                           : isDate
                           ? GestureDetector(
                               onTap: () async {
                                 final picked = await showDatePicker(
                                   context: context,
-                                  initialDate: DateTime.now(),
+                                  initialDate: _tglLahirCtrl.text.isNotEmpty
+                                      ? DateTime.parse(_tglLahirCtrl.text)
+                                      : DateTime.now(),
                                   firstDate: DateTime(1950),
                                   lastDate: DateTime.now(),
                                 );
                                 if (picked != null) {
                                   controller.text =
-                                      '${picked.day}/${picked.month}/${picked.year}';
+                                      '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
                                 }
                               },
                               child: AbsorbPointer(

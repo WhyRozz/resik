@@ -4,62 +4,46 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 
 class DetailPenarikanScreen extends StatefulWidget {
-  // ✅ TIDAK PERLU PARAMETER!
-  const DetailPenarikanScreen({super.key});
+  final Map<String, dynamic>? penarikanData;
+
+  const DetailPenarikanScreen({super.key, this.penarikanData});
 
   @override
   State<DetailPenarikanScreen> createState() => _DetailPenarikanScreenState();
 }
 
-class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
+class _DetailPenarikanScreenState extends State<DetailPenarikanScreen>
+    with SingleTickerProviderStateMixin {
   Map<String, dynamic>? _penarikanData;
   bool _isLoading = true;
 
-  // ✅ FORMAT WIB LANGSUNG - TANPA KONVERSI!
-  String _formatWIBFromString(dynamic value) {
-    if (value == null || value.toString().isEmpty) {
-      return '-';
-    }
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
 
+  String _formatWIBFromString(dynamic value) {
+    if (value == null || value.toString().isEmpty) return '-';
     try {
       final String str = value.toString();
-      debugPrint("🕐 Raw tanggal: $str");
-
       DateTime dt;
 
-      // ✅ HANDLE SEMUA FORMAT YANG MUNGKIN:
-
-      // Format 1: "dd-MM-yyyy HH:mm" (contoh: 20-05-2026 03:29)
       if (RegExp(r'^\d{2}-\d{2}-\d{4} \d{2}:\d{2}$').hasMatch(str)) {
         dt = DateFormat('dd-MM-yyyy HH:mm').parse(str);
-      }
-      // Format 2: "yyyy-MM-dd HH:mm:ss" (contoh: 2026-05-20 14:30:00)
-      else if (RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$').hasMatch(str)) {
+      } else if (RegExp(
+        r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$',
+      ).hasMatch(str)) {
         dt = DateFormat('yyyy-MM-dd HH:mm:ss').parse(str);
-      }
-      // Format 3: "yyyy-MM-dd HH:mm" (contoh: 2026-05-20 14:30)
-      else if (RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$').hasMatch(str)) {
+      } else if (RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$').hasMatch(str)) {
         dt = DateFormat('yyyy-MM-dd HH:mm').parse(str);
-      }
-      // Format 4: ISO string dengan Z (UTC)
-      else if (str.endsWith('Z')) {
+      } else if (str.endsWith('Z')) {
         dt = DateTime.parse(str).add(const Duration(hours: 7));
-      }
-      // Format 5: ISO string tanpa Z
-      else if (str.contains('T')) {
+      } else if (str.contains('T')) {
         dt = DateTime.parse(str);
-      }
-      // Fallback: parse langsung
-      else {
+      } else {
         dt = DateTime.parse(str);
       }
 
-      // Format untuk tampilan
-      final formatted = DateFormat('dd MMM yyyy, HH:mm').format(dt);
-      debugPrint("✅ Format WIB: $formatted");
-      return formatted;
+      return DateFormat('dd MMM yyyy, HH:mm').format(dt);
     } catch (e) {
-      debugPrint("❌ Error parsing tanggal: $e | Value: $value");
       return value.toString();
     }
   }
@@ -67,11 +51,35 @@ class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
   @override
   void initState() {
     super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    );
     _loadPenarikanData();
   }
 
-  // ✅ AMBIL DATA DARI SharedPreferences
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadPenarikanData() async {
+    if (widget.penarikanData != null) {
+      if (mounted) {
+        setState(() {
+          _penarikanData = widget.penarikanData;
+          _isLoading = false;
+        });
+        _fadeController.forward();
+      }
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final dataStr = prefs.getString('last_penarikan_detail');
 
@@ -79,33 +87,24 @@ class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
       if (dataStr != null) {
         final data = jsonDecode(dataStr);
 
-        debugPrint(
-          "🔍 Raw nama from storage: '${data['nama']}' (type: ${data['nama']?.runtimeType})",
-        );
-
-        // ✅ FIX: Jika nama kosong/null, ambil dari user_data SharedPreferences
-        if (data['nama'] == null ||
-            data['nama'].toString().trim().isEmpty ||
-            data['nama'].toString().toLowerCase() == 'null' ||
-            data['nama'].toString() == '-' ||
-            data['nama'].toString() == 'User') {
+        // PERBAIKAN: Cek nama dengan lebih ketat
+        final namaDariData = data['nama']?.toString().trim();
+        if (namaDariData == null ||
+            namaDariData.isEmpty ||
+            namaDariData.toLowerCase() == 'null' ||
+            namaDariData == '-' ||
+            namaDariData == 'User') {
           final userDataStr = prefs.getString('user_data');
-
           if (userDataStr != null) {
             try {
               final userData = jsonDecode(userDataStr);
-              data['nama'] = userData['nama'] ?? 'User';
-
-              final fallbackNama = userData['nama']?.toString()?.trim();
-              if (fallbackNama != null && fallbackNama.isNotEmpty) {
-                data['nama'] = fallbackNama;
-                debugPrint("✅ Fallback sukses: nama = '${data['nama']}'");
+              final namaUser = userData['nama']?.toString().trim();
+              if (namaUser != null && namaUser.isNotEmpty) {
+                data['nama'] = namaUser;
+                debugPrint('✅ Fallback nama dari user_data: $namaUser');
               }
-
-              // Debug log
-              debugPrint("🔄 Nama fallback dari user_data: ${data['nama']}");
             } catch (e) {
-              debugPrint("❌ Gagal parse user_data: $e");
+              debugPrint('❌ Gagal parse user_data: $e');
             }
           }
         }
@@ -117,48 +116,36 @@ class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
       } else {
         setState(() => _isLoading = false);
       }
+      _fadeController.forward();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // ✅ LOADING STATE
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    if (_penarikanData != null) {
-      debugPrint("🔍 Detail Penarikan Debug:");
-      debugPrint("   nama: '${_penarikanData!['nama']}'");
-      debugPrint("   status: '${_penarikanData!['status']}'");
-    }
-
-    // ✅ EMPTY STATE
-    if (_penarikanData == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF5F5F5),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF4CAF50),
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+        backgroundColor: const Color(0xFFF5F7FA),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+            ),
           ),
-          title: const Text(
-            'Detail Penarikan',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-        ),
-        body: const Center(
-          child: Text(
-            'Tidak ada data penarikan',
-            style: TextStyle(color: Colors.grey),
+          child: const SafeArea(
+            child: Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
           ),
         ),
       );
     }
 
-    // ✅ NULL SAFETY UNTUK SEMUA FIELD
+    if (_penarikanData == null) {
+      return _buildEmptyState();
+    }
+
     final int idPenarikan =
         _penarikanData!['id_penarikan'] ?? _penarikanData!['id'] ?? 0;
     final String idTransaksi = '#TRX-${idPenarikan.toString().padLeft(5, '0')}';
@@ -176,340 +163,656 @@ class _DetailPenarikanScreenState extends State<DetailPenarikanScreen> {
         ?.toString();
     final String? tanggalDisetujui = _penarikanData!['tanggal_disetujui']
         ?.toString();
-
-    // ✅ TAMBAHKAN 2 BARIS INI DI SINI (di luar Column)
     final String jenisLayanan = (_penarikanData!['jenis_layanan'] ?? 'e-wallet')
         .toString();
     final String namaBank = (_penarikanData!['nama_bank'] ?? '-').toString();
 
-    // ✅ FIX NAMA: Fallback ke user_data jika null
-    String nama = (_penarikanData!['nama'] ?? '').toString();
-    if (nama.isEmpty || nama == '-' || nama == 'null') {
-      nama = 'User';
+    // PERBAIKAN: Ambil nama dengan fallback ke user_data
+    String nama = (_penarikanData!['nama_penerima'] ?? '').toString().trim();
+    if (nama.isEmpty ||
+        nama == '-' ||
+        nama.toLowerCase() == 'null' ||
+        nama == 'User') {
+      // Fallback ke SharedPreferences
+      SharedPreferences.getInstance().then((prefs) {
+        final userDataStr = prefs.getString('user_data');
+        if (userDataStr != null) {
+          try {
+            final userData = jsonDecode(userDataStr);
+            nama = userData['nama']?.toString().trim() ?? 'User';
+            if (mounted) setState(() {}); // Refresh UI
+          } catch (e) {
+            nama = 'User';
+          }
+        }
+      });
     }
-    // Tentukan warna & icon status
+
     Color statusColor;
     IconData statusIcon;
     String statusText;
 
     switch (status.toLowerCase()) {
       case 'berhasil':
-        statusColor = const Color(0xFF4CAF50);
-        statusIcon = Icons.check_circle;
-        statusText = 'Berhasil';
+        statusColor = const Color(0xFF2E7D32);
+        statusIcon = Icons.check_circle_rounded;
+        statusText = 'BERHASIL';
         break;
       case 'proses':
       case 'pending':
       case 'diproses':
-        statusColor = const Color(0xFFFFC107);
-        statusIcon = Icons.schedule;
-        statusText = 'Diproses';
+        statusColor = const Color(0xFFEF6C00);
+        statusIcon = Icons.schedule_rounded;
+        statusText = 'DIPROSES';
         break;
       case 'ditolak':
-        statusColor = const Color(0xFFF44336);
-        statusIcon = Icons.cancel;
-        statusText = 'Ditolak';
+        statusColor = const Color(0xFFC62828);
+        statusIcon = Icons.cancel_rounded;
+        statusText = 'DITOLAK';
         break;
       default:
         statusColor = Colors.grey;
-        statusIcon = Icons.help;
-        statusText = status;
+        statusIcon = Icons.help_outline;
+        statusText = status.toUpperCase();
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF4CAF50),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Detail Penarikan',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-
-            // ✅ STATUS BADGE BESAR
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: statusColor, width: 2),
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: Column(
+        children: [
+          // ============ APPBAR ============
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 20),
+                child: Row(
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Struk Penarikan',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ============ STRUK CONTENT ============
+          Expanded(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _buildReceiptCard(
+                      idTransaksi: idTransaksi,
+                      status: statusText,
+                      statusColor: statusColor,
+                      statusIcon: statusIcon,
+                      tanggal: tanggal,
+                      nama: nama,
+                      jenisLayanan: jenisLayanan,
+                      namaBank: namaBank,
+                      jenisEWallet: jenisEWallet,
+                      nomorEWallet: nomorEWallet,
+                      jumlahUang: jumlahUang,
+                      tanggalDisetujui: tanggalDisetujui,
+                      alasanPenolakan: alasanPenolakan,
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: Column(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 20),
+                child: Row(
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Struk Penarikan',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(statusIcon, size: 24, color: statusColor),
-                  const SizedBox(width: 8),
-                  Text(
-                    statusText,
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4CAF50).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.receipt_long_rounded,
+                      size: 60,
+                      color: Color(0xFF4CAF50),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Data Tidak Tersedia',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: statusColor,
+                      color: Color(0xFF1B5E20),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceiptCard({
+    required String idTransaksi,
+    required String status,
+    required Color statusColor,
+    required IconData statusIcon,
+    required String tanggal,
+    required String nama,
+    required String jenisLayanan,
+    required String namaBank,
+    required String jenisEWallet,
+    required String nomorEWallet,
+    required double jumlahUang,
+    String? tanggalDisetujui,
+    String? alasanPenolakan,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // ===== HEADER STRUK =====
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [statusColor, statusColor.withOpacity(0.85)],
+              ),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Icon
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(statusIcon, color: statusColor, size: 32),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  status,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Penarikan Saldo',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.85),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ===== ZIGZAG EFFECT =====
+          SizedBox(
+            height: 12,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: -8,
+                  top: 0,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF5F7FA),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -8,
+                  top: 0,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF5F7FA),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                // Dashed line
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    child: CustomPaint(
+                      size: const Size(double.infinity, 1),
+                      painter: DashedLinePainter(
+                        color: Colors.grey.shade300,
+                        dashWidth: 5,
+                        dashSpace: 3,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ===== BODY STRUK =====
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Column(
+              children: [
+                // ID Transaksi
+                _buildReceiptRow(
+                  label: 'ID Transaksi',
+                  value: idTransaksi,
+                  isMonospace: true,
+                ),
+                _buildDashedDivider(),
+                _buildReceiptRow(label: 'Tanggal', value: tanggal),
+                _buildDashedDivider(),
+                _buildReceiptRow(label: 'Nama Penerima', value: nama),
+                _buildDashedDivider(),
+                _buildReceiptRow(
+                  label: 'Metode',
+                  value: jenisLayanan == 'bank' ? namaBank : jenisEWallet,
+                ),
+                _buildDashedDivider(),
+                _buildReceiptRow(
+                  label: jenisLayanan == 'bank'
+                      ? 'No. Rekening'
+                      : 'No. E-Wallet',
+                  value: nomorEWallet,
+                  isMonospace: true,
+                ),
+                if (tanggalDisetujui != null &&
+                    tanggalDisetujui.isNotEmpty) ...[
+                  _buildDashedDivider(),
+                  _buildReceiptRow(
+                    label: 'Disetujui',
+                    value: _formatWIBFromString(tanggalDisetujui),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // ===== TOTAL AMOUNT =====
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF4CAF50).withOpacity(0.3),
+              ),
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'TOTAL PENARIKAN',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF1B5E20),
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _formatRupiah(jumlahUang),
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2E7D32),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ===== ALASAN PENOLAKAN =====
+          if (status == 'DITOLAK' &&
+              alasanPenolakan != null &&
+              alasanPenolakan.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFC62828).withOpacity(0.2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFC62828),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.info_outline,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Alasan Penolakan',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFC62828),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    alasanPenolakan,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFC62828),
+                      height: 1.5,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 24),
-
-            // ✅ CARD INFO DETAIL
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ✅ ID TRANSAKSI (BARU - FORMAT #TRX-00062)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: const Color(0xFF4CAF50),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(
-                                Icons.confirmation_number,
-                                size: 18,
-                                color: Color(0xFF4CAF50),
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'ID Transaksi',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1B5E20),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            idTransaksi, // ✅ Format: #TRX-00062
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1B5E20),
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Tanggal Pengajuan
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Tanggal Pengajuan',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                tanggal,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1B5E20),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const Divider(height: 32),
-
-                    // Informasi Penarik
-                    const Text(
-                      'Informasi Penarik',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1B5E20),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDetailRow(
-                      'Nama',
-                      nama,
-                    ), // ✅ Nama sekarang tidak kosong
-                    const SizedBox(height: 8),
-                    _buildDetailRow(
-                      'Jenis Layanan',
-                      jenisLayanan == 'bank' ? namaBank : jenisEWallet,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildDetailRow(
-                      jenisLayanan == 'bank'
-                          ? 'Nomor Rekening'
-                          : 'Nomor E-Wallet',
-                      nomorEWallet,
-                    ),
-
-                    const Divider(height: 32),
-
-                    // Nominal Penarikan
-                    const Text(
-                      'Detail Penarikan',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1B5E20),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Jumlah Penarikan',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
-                          ),
-                          Text(
-                            'Rp ${jumlahUang.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1B5E20),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Tanggal Disetujui (jika ada)
-                    if (tanggalDisetujui != null &&
-                        tanggalDisetujui.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _buildDetailRow('Tanggal Disetujui', tanggalDisetujui),
-                    ],
-
-                    // Alasan Penolakan (jika ditolak)
-                    if (status.toLowerCase() == 'ditolak' &&
-                        alasanPenolakan != null &&
-                        alasanPenolakan.isNotEmpty) ...[
-                      const Divider(height: 32),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.red.shade200),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  size: 20,
-                                  color: Colors.red,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Alasan Penolakan',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              alasanPenolakan,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+          // ===== FOOTER STRUK =====
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAFAFA),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(20),
               ),
             ),
+            child: Column(
+              children: [
+                CustomPaint(
+                  size: const Size(double.infinity, 1),
+                  painter: DashedLinePainter(
+                    color: Colors.grey.shade300,
+                    dashWidth: 5,
+                    dashSpace: 3,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.eco_rounded,
+                      size: 14,
+                      color: const Color(0xFF4CAF50),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'RESIK - Bank Sampah Digital',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1B5E20),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Terima kasih telah menggunakan layanan kami',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[500],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Dicetak: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Colors.grey[400],
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            const SizedBox(height: 24),
-          ],
+  Widget _buildReceiptRow({
+    required String label,
+    required String value,
+    bool isMonospace = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(':  ', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1B5E20),
+                fontFamily: isMonospace ? 'monospace' : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashedDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: CustomPaint(
+        size: const Size(double.infinity, 1),
+        painter: DashedLinePainter(
+          color: Colors.grey.shade200,
+          dashWidth: 3,
+          dashSpace: 3,
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 140,
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 13, color: Colors.grey),
-          ),
-        ),
-        const Text(': ', style: TextStyle(fontSize: 13, color: Colors.grey)),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1B5E20),
-            ),
-          ),
-        ),
-      ],
-    );
+  String _formatRupiah(double angka) {
+    return 'Rp ${angka.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
   }
+}
+
+// ===== PAINTER UNTUK DASHED LINE =====
+class DashedLinePainter extends CustomPainter {
+  final Color color;
+  final double dashWidth;
+  final double dashSpace;
+
+  DashedLinePainter({
+    required this.color,
+    this.dashWidth = 5,
+    this.dashSpace = 3,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+
+    double startX = 0;
+    while (startX < size.width) {
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
+      startX += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
