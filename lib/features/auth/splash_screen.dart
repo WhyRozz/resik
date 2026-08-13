@@ -19,6 +19,7 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
+    // 1. Inisialisasi Animasi
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -29,52 +30,78 @@ class _SplashScreenState extends State<SplashScreen>
       end: 1.0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
-    // Fade IN
+    // Jalankan animasi Fade IN
     _controller.forward();
 
-    // Tunggu 2 detik, lalu Fade OUT dan navigate
-    Future.delayed(const Duration(milliseconds: 2000), () {
-      if (mounted) {
-        _controller.reverse().then((_) {
-          if (mounted) {
-            _checkLoginAndNavigate();
-          }
-        });
-      }
+    // 2. Tunggu 2.5 detik (waktu yang pas dan aman), lalu cek login
+    // Menggunakan satu Future.delayed lebih stabil daripada chaining .then()
+    // yang rentan gagal di HP dengan penghemat baterai agresif (Xiaomi, Oppo, dll).
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      _checkLoginAndNavigate();
     });
   }
 
   Future<void> _checkLoginAndNavigate() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    final bool isLoggedIn = prefs.getBool('is_logged_in') ?? false;
-    final String? userData = prefs.getString('user_data');
-
+    // 3. Cek mounted sebelum melakukan proses async
     if (!mounted) return;
 
-    if (isLoggedIn && userData != null) {
-      final data = jsonDecode(userData);
-      final tipe = data['tipe'];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final bool isLoggedIn = prefs.getBool('is_logged_in') ?? false;
+      final String? userData = prefs.getString('user_data');
 
-      if (tipe == 'petugas') {
-        Navigator.pushReplacementNamed(context, '/home-admin');
+      if (!mounted) return;
+
+      // 4. Validasi data dengan ketat
+      if (isLoggedIn && userData != null && userData.isNotEmpty) {
+        // Safe JSON Decode dengan casting yang jelas
+        final data = jsonDecode(userData) as Map<String, dynamic>;
+        final tipe = data['tipe']?.toString() ?? '';
+
+        if (tipe == 'petugas') {
+          Navigator.pushReplacementNamed(context, '/home-admin');
+        } else {
+          // Untuk masyarakat & pns
+          Navigator.pushReplacementNamed(context, '/home-user');
+        }
       } else {
-        // masyarakat & pns
-        Navigator.pushReplacementNamed(context, '/home-user');
+        // Jika tidak login, langsung ke Welcome Screen
+        _goToWelcomeScreen();
       }
-    } else {
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              const WelcomeScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
+    } catch (e) {
+      // 5. FALLBACK PENTING: Jika terjadi error (misal: JSON korup, prefs error),
+      // JANGAN biarkan aplikasi stuck atau crash.
+      debugPrint('❌ [SplashScreen] Error saat memproses data: $e');
+
+      try {
+        // Bersihkan data yang mungkin korup agar tidak error berulang
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('is_logged_in');
+        await prefs.remove('user_data');
+      } catch (clearError) {
+        debugPrint('❌ [SplashScreen] Gagal membersihkan prefs: $clearError');
+      }
+
+      // Arahkan user ke Welcome Screen dengan aman
+      if (mounted) {
+        _goToWelcomeScreen();
+      }
     }
+  }
+
+  // Fungsi terpisah untuk navigasi ke Welcome Screen agar kode lebih rapi
+  void _goToWelcomeScreen() {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const WelcomeScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
   }
 
   @override
@@ -103,6 +130,15 @@ class _SplashScreenState extends State<SplashScreen>
               width: 180,
               height: 180,
               fit: BoxFit.contain,
+              // 6. Error Builder: Mencegah layar putih/crash jika gambar gagal dimuat
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('❌ [SplashScreen] Gagal memuat logo: $error');
+                return const Icon(
+                  Icons.error_outline,
+                  size: 180,
+                  color: Colors.red,
+                );
+              },
             ),
           ),
         ),
